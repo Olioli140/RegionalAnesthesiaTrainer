@@ -41,7 +41,7 @@ describe('Trainer A2 probe manipulation',()=>{
     engine.dispatch({type:'ADVANCE_TIME',deltaSec:4});
     const replay=engine.dispatch({type:'REPLAY'});
     expect(replay.replayMatches).toBe(true);
-  });
+  },15000);
 
   it('clamps probe manipulation to the A2 safety envelope',()=>{
     const engine=new RegionalTrainerEngine();

@@ -4,12 +4,29 @@ import { createAdductorCanalAnatomy, ADDUCTOR_CANAL_PRESET } from '../../../../c
 import { getAdductorCanalGoldenPose, ADDUCTOR_CANAL_GOLDEN_POSE_ID } from '../../../../cores/regional-anesthesia/anatomy/adductor-canal-golden-poses.js';
 import { resolveScanPlane } from '../../../../cores/regional-anesthesia/scan-plane/scan-plane-resolver.js';
 import { createCompletedUltrasoundPhysicsField } from '../../../../cores/regional-anesthesia/ultrasound/ultrasound-physics-completion.js';
+import { pointAlongNeedle } from '../../../../cores/regional-anesthesia/needle/needle-geometry.js';
 import { createNeedleInteractionSnapshot } from '../../../../cores/regional-anesthesia/needle/needle-interaction.js';
 import { createInjectionActionState, INJECTION_ACTION } from '../../../../cores/regional-anesthesia/injection/injection-actions.js';
 import { createPressureFlowState, reducePressureFlowAction } from '../../../../cores/regional-anesthesia/injection/injection-pressure-flow.js';
 import { createInjectionSpreadState, advanceInjectionSpread } from '../../../../cores/regional-anesthesia/injection/injection-spread.js';
 import { createFluidUltrasoundOverlay } from '../../../../cores/regional-anesthesia/injection/injection-ultrasound-spread.js';
 import { TRAINER_PROTOCOL_VERSION, type TrainerAction, type TrainerSnapshot } from '../protocol';
+
+// The canonical simulation cores are intentionally JavaScript today. The adapter is the
+// TypeScript boundary: core calls are widened here while the public worker protocol and UI
+// remain strictly typed. This avoids duplicating simulation contracts inside React.
+const core = {
+  createCompletedUltrasoundPhysicsField: createCompletedUltrasoundPhysicsField as (...args: any[]) => any,
+  createNeedleGeometry: createNeedleGeometry as (...args: any[]) => any,
+  createNeedleInteractionSnapshot: createNeedleInteractionSnapshot as (...args: any[]) => any,
+  createInjectionActionState: createInjectionActionState as (...args: any[]) => any,
+  createPressureFlowState: createPressureFlowState as (...args: any[]) => any,
+  reducePressureFlowAction: reducePressureFlowAction as (...args: any[]) => any,
+  createInjectionSpreadState: createInjectionSpreadState as (...args: any[]) => any,
+  advanceInjectionSpread: advanceInjectionSpread as (...args: any[]) => any,
+  createFluidUltrasoundOverlay: createFluidUltrasoundOverlay as (...args: any[]) => any,
+  pointAlongNeedle: pointAlongNeedle as (...args: any[]) => any
+};
 
 const CASE_ID = 'ACB_TECHNICAL_SANDBOX_V1' as const;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -34,7 +51,7 @@ export class RegionalTrainerEngine {
     this.dataset = createAdductorCanalAnatomy(ADDUCTOR_CANAL_PRESET.STANDARD);
     const pose = getAdductorCanalGoldenPose(ADDUCTOR_CANAL_GOLDEN_POSE_ID.TRANSVERSE_TARGET);
     this.scanPlane = resolveScanPlane(pose.probeState, pose.scanSettings);
-    this.baseField = createCompletedUltrasoundPhysicsField({
+    this.baseField = core.createCompletedUltrasoundPhysicsField({
       dataset: this.dataset,
       scanPlane: this.scanPlane,
       seed: 'trainer-a1-acb-sandbox',
@@ -44,7 +61,7 @@ export class RegionalTrainerEngine {
       frequencyMHz: 12,
       focusDepthMm: 42
     });
-    this.needle = createNeedleGeometry({
+    this.needle = core.createNeedleGeometry({
       id: 'trainer-a1-needle',
       entryPointMm: vec3(-22, -5, 0),
       tipPointMm: vec3(1, 43, 0),
@@ -54,7 +71,7 @@ export class RegionalTrainerEngine {
   }
 
   private needleInteraction() {
-    return createNeedleInteractionSnapshot({
+    return core.createNeedleInteractionSnapshot({
       dataset: this.dataset,
       needle: this.needle,
       scanPlane: this.scanPlane,
@@ -65,20 +82,20 @@ export class RegionalTrainerEngine {
 
   reset(): TrainerSnapshot {
     const insertionFraction = 0.25;
-    const needleInteraction = createNeedleInteractionSnapshot({
+    const needleInteraction = core.createNeedleInteractionSnapshot({
       dataset: this.dataset,
       needle: this.needle,
       scanPlane: this.scanPlane,
       baseField: this.baseField,
       insertionFraction
     });
-    const injectionState = createInjectionActionState({
+    const injectionState = core.createInjectionActionState({
       needleInteraction,
       initialVolumeMl: 20,
       requestedFlowMlPerMin: 6
     });
-    const pressureFlowState = createPressureFlowState({ injectionState, pressureLimitKPa: 20 });
-    const spreadState = createInjectionSpreadState({ pressureFlowState });
+    const pressureFlowState = core.createPressureFlowState({ injectionState, pressureLimitKPa: 20 });
+    const spreadState = core.createInjectionSpreadState({ pressureFlowState });
     this.state = { insertionFraction, timeSec: 0, pressureFlowState, spreadState, replayMatches: null };
     this.actionLog = [];
     return this.snapshot();
@@ -93,13 +110,13 @@ export class RegionalTrainerEngine {
       this.state.insertionFraction = clamp(action.fraction, 0, 1);
     } else {
       const mapped = this.mapInjectionAction(action);
-      this.state.pressureFlowState = reducePressureFlowAction(
+      this.state.pressureFlowState = core.reducePressureFlowAction(
         this.state.pressureFlowState,
         mapped,
         { needleInteraction }
       );
       if (action.type === 'ADVANCE_TIME') this.state.timeSec += action.deltaSec;
-      this.state.spreadState = advanceInjectionSpread(this.state.spreadState, this.state.pressureFlowState);
+      this.state.spreadState = core.advanceInjectionSpread(this.state.spreadState, this.state.pressureFlowState);
     }
 
     this.state.replayMatches = null;
@@ -133,11 +150,12 @@ export class RegionalTrainerEngine {
   snapshot(): TrainerSnapshot {
     const needleInteraction = this.needleInteraction();
     const injection = this.state.pressureFlowState.injectionState;
-    const ultrasound = createFluidUltrasoundOverlay({
+    const ultrasound = core.createFluidUltrasoundOverlay({
       baseField: needleInteraction.acoustics,
       spreadState: this.state.spreadState,
       scanPlane: this.scanPlane
     });
+    const currentTipPointMm = core.pointAlongNeedle(this.needle, this.state.insertionFraction);
 
     return {
       protocolVersion: TRAINER_PROTOCOL_VERSION,
@@ -166,7 +184,7 @@ export class RegionalTrainerEngine {
           insertionFraction: needleInteraction.insertionFraction,
           activeStructureIds: needleInteraction.insertion.activeStructureIds,
           crossedEvents: needleInteraction.insertion.crossedEvents,
-          tipPointMm: needleInteraction.insertion.tipPointMm
+          tipPointMm: currentTipPointMm
         },
         pressureFlow: {
           kind: this.state.pressureFlowState.kind,

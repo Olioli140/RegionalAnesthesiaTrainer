@@ -1,0 +1,14 @@
+{
+  "name": "regional-anesthesia-trainer-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix apps/regional-anesthesia-trainer run dev",
+    "typecheck": "npm --prefix apps/regional-anesthesia-trainer run typecheck",
+    "test:trainer": "npm --prefix apps/regional-anesthesia-trainer run test",
+    "test:core": "node tests/public-core-smoke.test.mjs",
+    "test": "npm run test:core && npm run test:trainer",
+    "build": "npm --prefix apps/regional-anesthesia-trainer run build"
+  }
+}

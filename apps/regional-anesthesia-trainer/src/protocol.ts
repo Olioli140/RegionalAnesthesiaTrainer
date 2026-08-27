@@ -1,8 +1,25 @@
-export const TRAINER_PROTOCOL_VERSION = 'regional-trainer-a1.v1' as const;
+export const TRAINER_PROTOCOL_VERSION = 'regional-trainer-a2.v1' as const;
+
+export interface Vec3Snapshot { x: number; y: number; z: number; }
+export interface ProbeSnapshot {
+  positionMm: Vec3Snapshot;
+  contactPointMm: Vec3Snapshot;
+  slideMm: number;
+  rotationDeg: number;
+  tiltDeg: number;
+  rockDeg: number;
+  pressure: number;
+  contact: boolean;
+}
 
 export type TrainerAction =
   | { type: 'RESET' }
   | { type: 'SET_INSERTION_FRACTION'; fraction: number }
+  | { type: 'PROBE_SLIDE'; deltaMm: number }
+  | { type: 'PROBE_ROTATE'; deltaDeg: number }
+  | { type: 'PROBE_TILT'; deltaDeg: number }
+  | { type: 'PROBE_ROCK'; deltaDeg: number }
+  | { type: 'PROBE_PRESSURE_SET'; pressure: number }
   | { type: 'ASPIRATE' }
   | { type: 'START_INJECTION' }
   | { type: 'STOP_INJECTION' }
@@ -10,16 +27,13 @@ export type TrainerAction =
   | { type: 'ADVANCE_TIME'; deltaSec: number }
   | { type: 'REPLAY' };
 
-export interface UltrasoundFrame {
-  widthPx: number;
-  heightPx: number;
-  pixels: number[];
-}
+export interface UltrasoundFrame { widthPx: number; heightPx: number; pixels: number[]; }
 
 export interface TrainerSnapshot {
   protocolVersion: typeof TRAINER_PROTOCOL_VERSION;
   caseId: 'ACB_TECHNICAL_SANDBOX_V1';
   timeSec: number;
+  probe: ProbeSnapshot;
   insertionFraction: number;
   aspiration: string | null;
   injectionActive: boolean;
@@ -39,7 +53,6 @@ export interface TrainerSnapshot {
 export type WorkerRequest =
   | { protocolVersion: typeof TRAINER_PROTOCOL_VERSION; kind: 'INIT' }
   | { protocolVersion: typeof TRAINER_PROTOCOL_VERSION; kind: 'ACTION'; action: TrainerAction };
-
 export type WorkerResponse =
   | { protocolVersion: typeof TRAINER_PROTOCOL_VERSION; kind: 'SNAPSHOT'; snapshot: TrainerSnapshot }
   | { protocolVersion: typeof TRAINER_PROTOCOL_VERSION; kind: 'ERROR'; message: string };

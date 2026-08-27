@@ -22,6 +22,21 @@ Simulation truth remains in deterministic canonical cores. UI layers only dispat
 - MVP D1-D4: aspiration/injection actions, pressure-limited actual flow, persistent 3D fluid spread, ultrasound hydrodissection overlay
 - Trainer A1: React/TypeScript participant shell with Dedicated Web Worker and deterministic replay
 
+## Quick start
+
+```bash
+npm install --prefix apps/regional-anesthesia-trainer
+npm run dev
+```
+
+Validation commands:
+
+```bash
+npm run test
+npm run typecheck
+npm run build
+```
+
 ## Roadmap
 
 - Trainer A2: real probe manipulation + synchronized patient/probe 3D scene
@@ -29,6 +44,10 @@ Simulation truth remains in deterministic canonical cores. UI layers only dispat
 - Trainer A4: complete syringe/pressure/injection/spread/hydrodissection interaction
 - Trainer A5: cases, participant/instructor separation, replay and debriefing
 - Later: assessment, curriculum and clinical validation
+
+## Validation and safety
+
+See `docs/VALIDATION.md` for the distinction between deterministic engineering validation and future clinical validation.
 
 ## License
 

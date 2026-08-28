@@ -1,4 +1,4 @@
-export const TRAINER_PROTOCOL_VERSION = 'regional-trainer-a3.v1' as const;
+export const TRAINER_PROTOCOL_VERSION = 'regional-trainer-a4.v1' as const;
 
 export interface Vec3Snapshot { x: number; y: number; z: number; }
 export interface ProbeSnapshot {
@@ -21,6 +21,24 @@ export interface NeedleSnapshot {
   outOfPlaneAngleDeg: number;
   scanRelation: string | null;
   inViewport: boolean;
+}
+export interface InjectionSnapshot {
+  active: boolean;
+  aspiration: string | null;
+  requestedFlowMlPerMin: number;
+  actualFlowMlPerMin: number;
+  maxFlowMlPerMin: number;
+  pressureLimited: boolean;
+  linePressureKPa: number;
+  pressureLimitKPa: number;
+  openingPressureKPa: number;
+  needleResistanceKPaPerMlMin: number;
+  totalResistanceKPaPerMlMin: number;
+  dominantEnvironment: string;
+  deliveredVolumeMl: number;
+  remainingVolumeMl: number;
+  spreadVolumeMl: number;
+  depotCount: number;
 }
 
 export type TrainerAction =
@@ -49,6 +67,7 @@ export interface TrainerSnapshot {
   timeSec: number;
   probe: ProbeSnapshot;
   needle: NeedleSnapshot;
+  injection: InjectionSnapshot;
   insertionFraction: number;
   aspiration: string | null;
   injectionActive: boolean;

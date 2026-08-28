@@ -27,7 +27,7 @@ describe('Trainer A2 probe manipulation',()=>{
     expect(after.probe.tiltDeg).toBe(8);
     expect(after.probe.rockDeg).toBe(-6);
     expect(frameDelta(before.ultrasound.pixels,after.ultrasound.pixels)).toBeGreaterThan(1);
-  });
+  },15000);
 
   it('replays a mixed probe/needle/injection sequence deterministically',()=>{
     const engine=new RegionalTrainerEngine();

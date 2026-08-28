@@ -23,3 +23,25 @@ jobs:
         run: npm run test:trainer
       - name: Production build
         run: npm run build
+      - name: Add preview launcher notes
+        run: |
+          cat > apps/regional-anesthesia-trainer/dist/START_PREVIEW.txt <<'EOF'
+          Regional Anesthesia Trainer Preview
+
+          Serve this folder through a local HTTP server (ES modules/workers should not be opened directly with file://).
+
+          Python 3:
+            python -m http.server 4173
+          Then open:
+            http://localhost:4173
+
+          Node alternative:
+            npx serve .
+          EOF
+      - name: Upload trainer preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: regional-anesthesia-trainer-preview-${{ github.sha }}
+          path: apps/regional-anesthesia-trainer/dist
+          if-no-files-found: error
+          retention-days: 14

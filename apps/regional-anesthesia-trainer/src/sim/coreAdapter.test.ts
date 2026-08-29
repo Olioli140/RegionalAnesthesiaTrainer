@@ -36,6 +36,15 @@ describe('RegionalTrainerEngine', () => {
     expect(snapshot.actionCount).toBe(0);
   });
 
+  it('reuses the deterministic frame for actions that cannot change ultrasound', () => {
+    const engine = new RegionalTrainerEngine();
+    const initial = engine.snapshot().ultrasound;
+    expect(engine.dispatch({ type: 'ASPIRATE' }).ultrasound).toEqual(initial);
+    expect(engine.dispatch({ type: 'START_INJECTION' }).ultrasound).toEqual(initial);
+    expect(engine.dispatch({ type: 'STOP_INJECTION' }).ultrasound).toEqual(initial);
+    expect(engine.dispatch({ type: 'SET_REQUESTED_FLOW', flowMlPerMin: 8 }).ultrasound).toEqual(initial);
+  });
+
   it('renders the versioned deterministic A6.5 appearance field', () => {
     const first = new RegionalTrainerEngine().snapshot();
     const second = new RegionalTrainerEngine().snapshot();

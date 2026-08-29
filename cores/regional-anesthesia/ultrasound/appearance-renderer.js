@@ -3,7 +3,8 @@ const clamp01=(value)=>Math.max(0,Math.min(1,value));
 export const ULTRASOUND_APPEARANCE_PROFILE=Object.freeze({
   A6_ADDUCTOR_CANAL_V1:'A6_ADDUCTOR_CANAL_V1',
   A6_ADDUCTOR_CANAL_V2:'A6_ADDUCTOR_CANAL_V2',
-  A6_ADDUCTOR_CANAL_V3:'A6_ADDUCTOR_CANAL_V3'
+  A6_ADDUCTOR_CANAL_V3:'A6_ADDUCTOR_CANAL_V3',
+  A6_ADDUCTOR_CANAL_V4:'A6_ADDUCTOR_CANAL_V4'
 });
 
 const BASE_PROFILE=Object.freeze({
@@ -36,6 +37,12 @@ const PROFILES=Object.freeze({
   [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V3]:Object.freeze({
     ...BASE_PROFILE,tissueSignatures:TISSUE_SIGNATURES,
     worldSpeckle:Object.freeze({seed:'a6-adductor-canal-world-speckle-v1',correlationLengthMm:2.8,strength:0.10})
+  }),
+  [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V4]:Object.freeze({
+    ...BASE_PROFILE,tissueSignatures:TISSUE_SIGNATURES,
+    worldSpeckle:Object.freeze({seed:'a6-adductor-canal-world-speckle-v1',correlationLengthMm:2.8,strength:0.10}),
+    angleResponse:Object.freeze({nerveMin:0.55,nervePower:3,fasciaMin:0.55,fasciaPower:4}),
+    posteriorArtifacts:Object.freeze({arteryEnhancement:0.12,veinEnhancement:0.10,enhancementDecayMm:18,fasciaShadow:0.06,shadowDecayMm:10})
   })
 });
 
@@ -95,6 +102,41 @@ function tissueMap(value,tissueClass,profile){
   return clamp01(Math.pow(clamp01(value*signature.gain),signature.gamma));
 }
 
+function dot(a,b){return a.x*b.x+a.y*b.y+a.z*b.z;}
+function angleResponseMap(value,tissueClass,scanPlane,profile){
+  if(!profile.angleResponse||!tissueClass) return value;
+  if(!scanPlane?.depthAxis) throw new TypeError('scanPlane is required for angle-dependent appearance');
+  const settings=profile.angleResponse;
+  if(tissueClass==='nerve'){
+    const longitudinalCosine=Math.min(1,Math.abs(dot(scanPlane.depthAxis,{x:0,y:0,z:1})));
+    const transverse=Math.sqrt(Math.max(0,1-longitudinalCosine*longitudinalCosine));
+    return clamp01(value*(settings.nerveMin+(1-settings.nerveMin)*Math.pow(transverse,settings.nervePower)));
+  }
+  if(tissueClass==='fascia'){
+    const normalIncidence=Math.min(1,Math.abs(dot(scanPlane.depthAxis,{x:0,y:1,z:0})));
+    return clamp01(value*(settings.fasciaMin+(1-settings.fasciaMin)*Math.pow(normalIncidence,settings.fasciaPower)));
+  }
+  return value;
+}
+
+function applyPosteriorArtifacts(pixels,tissueClasses,widthPx,heightPx,depthMm,profile){
+  if(!profile.posteriorArtifacts||!tissueClasses) return pixels;
+  const settings=profile.posteriorArtifacts,dy=depthMm/heightPx,output=Array.from(pixels);
+  const enhancementDecay=Math.exp(-dy/settings.enhancementDecayMm),shadowDecay=Math.exp(-dy/settings.shadowDecayMm);
+  for(let x=0;x<widthPx;x++){
+    let enhancement=0,shadow=0;
+    for(let y=0;y<heightPx;y++){
+      const index=y*widthPx+x,tissue=tissueClasses[index];
+      output[index]=clamp01(output[index]*(1+enhancement-shadow));
+      enhancement*=enhancementDecay;shadow*=shadowDecay;
+      if(tissue==='artery') enhancement=Math.max(enhancement,settings.arteryEnhancement);
+      else if(tissue==='vein') enhancement=Math.max(enhancement,settings.veinEnhancement);
+      else if(tissue==='fascia') shadow=Math.max(shadow,settings.fasciaShadow);
+    }
+  }
+  return output;
+}
+
 function coherentSpeckleMap(value,index,sourceField,scanPlane,structureIds,profile,seedCache){
   if(!profile.worldSpeckle) return value;
   if(!scanPlane?.originMm||!scanPlane?.lateralAxis||!scanPlane?.depthAxis) throw new TypeError('scanPlane is required for pose-coherent appearance');
@@ -110,7 +152,7 @@ function coherentSpeckleMap(value,index,sourceField,scanPlane,structureIds,profi
 export function createDeterministicUltrasoundAppearanceField({
   sourceField,
   scanPlane,
-  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V3
+  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V4
 }={}){
   validateField(sourceField);
   const profile=PROFILES[profileId];
@@ -124,7 +166,8 @@ export function createDeterministicUltrasoundAppearanceField({
   const toneMapped=sourceField.pixels.map((value,index)=>{
     const y=Math.floor(index/widthPx);
     const tissueValue=tissueMap(toneMap(value,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
-    return coherentSpeckleMap(tissueValue,index,sourceField,scanPlane,structureIds,profile,seedCache);
+    const angleValue=angleResponseMap(tissueValue,tissueClasses?.[index],scanPlane,profile);
+    return coherentSpeckleMap(angleValue,index,sourceField,scanPlane,structureIds,profile,seedCache);
   });
   const pixels=toneMapped.map((value,index)=>{
     const y=Math.floor(index/widthPx);
@@ -132,9 +175,10 @@ export function createDeterministicUltrasoundAppearanceField({
     const axialMean=(toneMapped[index-widthPx]+toneMapped[index+widthPx])*.5;
     return clamp01(value*(1-profile.axialSmoothing)+axialMean*profile.axialSmoothing);
   });
+  const artifactPixels=applyPosteriorArtifacts(pixels,tissueClasses,widthPx,heightPx,sourceField.depthMm,profile);
   return Object.freeze({
     kind:'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-    version:profile.worldSpeckle?'A6.3':profile.tissueSignatures?'A6.2':'A6.1',
+    version:profile.posteriorArtifacts?'A6.4':profile.worldSpeckle?'A6.3':profile.tissueSignatures?'A6.2':'A6.1',
     profileId,
     sourceKind:sourceField.kind,
     widthPx:sourceField.widthPx,
@@ -144,7 +188,10 @@ export function createDeterministicUltrasoundAppearanceField({
     calibrationStatus:'ENGINEERING_CALIBRATION',
     tissueSignatureStatus:profile.tissueSignatures?'TISSUE_CLASS_MAPPED':'DISABLED',
     poseContinuityStatus:profile.worldSpeckle?'WORLD_COORDINATE_COHERENT':'DISABLED',
+    angleResponseStatus:profile.angleResponse?'NERVE_FASCIA_ANGLE_DEPENDENT':'DISABLED',
+    needleAngleResponseStatus:profile.angleResponse?'CANONICAL_NEEDLE_CORE':'DISABLED',
+    posteriorArtifactStatus:profile.posteriorArtifacts?'VESSEL_ENHANCEMENT_FASCIA_SHADOW':'DISABLED',
     tissueClasses:tissueClasses?Object.freeze(Array.from(tissueClasses)):null,
-    pixels:Object.freeze(pixels)
+    pixels:Object.freeze(artifactPixels)
   });
 }

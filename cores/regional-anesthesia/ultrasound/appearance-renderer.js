@@ -4,7 +4,8 @@ export const ULTRASOUND_APPEARANCE_PROFILE=Object.freeze({
   A6_ADDUCTOR_CANAL_V1:'A6_ADDUCTOR_CANAL_V1',
   A6_ADDUCTOR_CANAL_V2:'A6_ADDUCTOR_CANAL_V2',
   A6_ADDUCTOR_CANAL_V3:'A6_ADDUCTOR_CANAL_V3',
-  A6_ADDUCTOR_CANAL_V4:'A6_ADDUCTOR_CANAL_V4'
+  A6_ADDUCTOR_CANAL_V4:'A6_ADDUCTOR_CANAL_V4',
+  A6_ADDUCTOR_CANAL_V5:'A6_ADDUCTOR_CANAL_V5'
 });
 
 const BASE_PROFILE=Object.freeze({
@@ -43,6 +44,13 @@ const PROFILES=Object.freeze({
     worldSpeckle:Object.freeze({seed:'a6-adductor-canal-world-speckle-v1',correlationLengthMm:2.8,strength:0.10}),
     angleResponse:Object.freeze({nerveMin:0.55,nervePower:3,fasciaMin:0.55,fasciaPower:4}),
     posteriorArtifacts:Object.freeze({arteryEnhancement:0.12,veinEnhancement:0.10,enhancementDecayMm:18,fasciaShadow:0.06,shadowDecayMm:10})
+  }),
+  [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V5]:Object.freeze({
+    ...BASE_PROFILE,tissueSignatures:TISSUE_SIGNATURES,
+    worldSpeckle:Object.freeze({seed:'a6-adductor-canal-world-speckle-v1',correlationLengthMm:2.8,strength:0.10}),
+    angleResponse:Object.freeze({nerveMin:0.55,nervePower:3,fasciaMin:0.55,fasciaPower:4}),
+    posteriorArtifacts:Object.freeze({arteryEnhancement:0.12,veinEnhancement:0.10,enhancementDecayMm:18,fasciaShadow:0.06,shadowDecayMm:10}),
+    operatorControls:true
   })
 });
 
@@ -152,12 +160,15 @@ function coherentSpeckleMap(value,index,sourceField,scanPlane,structureIds,profi
 export function createDeterministicUltrasoundAppearanceField({
   sourceField,
   scanPlane,
-  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V4
+  operatorSettings={},
+  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V5
 }={}){
   validateField(sourceField);
   const profile=PROFILES[profileId];
   if(!profile) throw new RangeError(`unknown ultrasound appearance profile ${profileId}`);
   const {widthPx,heightPx}=sourceField;
+  const gainDb=profile.operatorControls?Math.max(-18,Math.min(18,Number(operatorSettings.gainDb)||0)):0;
+  const operatorGain=Math.pow(10,gainDb/20);
   const tissueClasses=sourceField.baseTissueClasses||sourceField.tissueClasses||null;
   const structureIds=sourceField.baseStructureIds||sourceField.structureIds||null;
   const seedCache=new Map();
@@ -165,7 +176,7 @@ export function createDeterministicUltrasoundAppearanceField({
   if(structureIds&&structureIds.length!==sourceField.pixels.length) throw new RangeError('structure id dimensions do not match');
   const toneMapped=sourceField.pixels.map((value,index)=>{
     const y=Math.floor(index/widthPx);
-    const tissueValue=tissueMap(toneMap(value,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
+    const tissueValue=tissueMap(toneMap(value*operatorGain,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
     const angleValue=angleResponseMap(tissueValue,tissueClasses?.[index],scanPlane,profile);
     return coherentSpeckleMap(angleValue,index,sourceField,scanPlane,structureIds,profile,seedCache);
   });
@@ -178,7 +189,7 @@ export function createDeterministicUltrasoundAppearanceField({
   const artifactPixels=applyPosteriorArtifacts(pixels,tissueClasses,widthPx,heightPx,sourceField.depthMm,profile);
   return Object.freeze({
     kind:'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-    version:profile.posteriorArtifacts?'A6.4':profile.worldSpeckle?'A6.3':profile.tissueSignatures?'A6.2':'A6.1',
+    version:profile.operatorControls?'A6.5':profile.posteriorArtifacts?'A6.4':profile.worldSpeckle?'A6.3':profile.tissueSignatures?'A6.2':'A6.1',
     profileId,
     sourceKind:sourceField.kind,
     widthPx:sourceField.widthPx,
@@ -191,6 +202,8 @@ export function createDeterministicUltrasoundAppearanceField({
     angleResponseStatus:profile.angleResponse?'NERVE_FASCIA_ANGLE_DEPENDENT':'DISABLED',
     needleAngleResponseStatus:profile.angleResponse?'CANONICAL_NEEDLE_CORE':'DISABLED',
     posteriorArtifactStatus:profile.posteriorArtifacts?'VESSEL_ENHANCEMENT_FASCIA_SHADOW':'DISABLED',
+    operatorControlStatus:profile.operatorControls?'WORKER_CONTROLLED':'DISABLED',
+    gainDb,
     tissueClasses:tissueClasses?Object.freeze(Array.from(tissueClasses)):null,
     pixels:Object.freeze(artifactPixels)
   });

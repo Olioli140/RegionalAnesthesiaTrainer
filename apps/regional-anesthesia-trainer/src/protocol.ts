@@ -40,6 +40,12 @@ export interface InjectionSnapshot {
   spreadVolumeMl: number;
   depotCount: number;
 }
+export interface ImagingSnapshot {
+  gainDb: number;
+  depthMm: number;
+  focusDepthMm: number;
+  dynamicRangeDb: number;
+}
 
 export type TrainerAction =
   | { type: 'RESET' }
@@ -53,6 +59,10 @@ export type TrainerAction =
   | { type: 'PROBE_TILT'; deltaDeg: number }
   | { type: 'PROBE_ROCK'; deltaDeg: number }
   | { type: 'PROBE_PRESSURE_SET'; pressure: number }
+  | { type: 'SET_ULTRASOUND_GAIN'; gainDb: number }
+  | { type: 'SET_ULTRASOUND_DEPTH'; depthMm: number }
+  | { type: 'SET_ULTRASOUND_FOCUS'; focusDepthMm: number }
+  | { type: 'SET_ULTRASOUND_DYNAMIC_RANGE'; dynamicRangeDb: number }
   | { type: 'ASPIRATE' }
   | { type: 'START_INJECTION' }
   | { type: 'STOP_INJECTION' }
@@ -68,6 +78,7 @@ export interface TrainerSnapshot {
   probe: ProbeSnapshot;
   needle: NeedleSnapshot;
   injection: InjectionSnapshot;
+  imaging: ImagingSnapshot;
   insertionFraction: number;
   aspiration: string | null;
   injectionActive: boolean;

@@ -35,4 +35,16 @@ describe('RegionalTrainerEngine', () => {
     expect(snapshot.deliveredVolumeMl).toBe(0);
     expect(snapshot.actionCount).toBe(0);
   });
+
+  it('renders the versioned deterministic A6.1 appearance field', () => {
+    const first = new RegionalTrainerEngine().snapshot();
+    const second = new RegionalTrainerEngine().snapshot();
+    expect(first.ultrasound).toEqual(second.ultrasound);
+    expect((first.developer as any).appearance).toEqual({
+      kind: 'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
+      version: 'A6.1',
+      profileId: 'A6_ADDUCTOR_CANAL_V1',
+      sourceKind: 'DETERMINISTIC_ULTRASOUND_FLUID_OVERLAY_FIELD'
+    });
+  });
 });

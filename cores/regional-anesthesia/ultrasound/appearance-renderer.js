@@ -46,7 +46,14 @@ function hash32(text){
 }
 const smooth=(value)=>value*value*(3-2*value);
 const lerp=(a,b,t)=>a+(b-a)*t;
-function lattice(seed,x,y,z){return hash32(`${seed}|${x}|${y}|${z}`)/0xffffffff*2-1;}
+function lattice(seed,x,y,z){
+  let hash=seed;
+  hash=Math.imul(hash^(x|0),16777619);
+  hash=Math.imul(hash^(y|0),16777619);
+  hash=Math.imul(hash^(z|0),16777619);
+  hash^=hash>>>16;hash=Math.imul(hash,0x7feb352d);hash^=hash>>>15;hash=Math.imul(hash,0x846ca68b);hash^=hash>>>16;
+  return (hash>>>0)/0xffffffff*2-1;
+}
 function worldNoise(seed,point,correlationLengthMm){
   const gx=point.x/correlationLengthMm,gy=point.y/correlationLengthMm,gz=point.z/correlationLengthMm;
   const x0=Math.floor(gx),y0=Math.floor(gy),z0=Math.floor(gz);
@@ -88,13 +95,15 @@ function tissueMap(value,tissueClass,profile){
   return clamp01(Math.pow(clamp01(value*signature.gain),signature.gamma));
 }
 
-function coherentSpeckleMap(value,index,sourceField,scanPlane,structureIds,profile){
+function coherentSpeckleMap(value,index,sourceField,scanPlane,structureIds,profile,seedCache){
   if(!profile.worldSpeckle) return value;
   if(!scanPlane?.originMm||!scanPlane?.lateralAxis||!scanPlane?.depthAxis) throw new TypeError('scanPlane is required for pose-coherent appearance');
   const settings=profile.worldSpeckle;
   const point=worldPointForPixel(index,sourceField,scanPlane);
   const structureKey=structureIds?.[index]||'background';
-  const noise=worldNoise(`${settings.seed}|${structureKey}`,point,settings.correlationLengthMm);
+  let seed=seedCache.get(structureKey);
+  if(seed===undefined){seed=hash32(`${settings.seed}|${structureKey}`);seedCache.set(structureKey,seed);}
+  const noise=worldNoise(seed,point,settings.correlationLengthMm);
   return clamp01(value*(1+noise*settings.strength));
 }
 
@@ -109,12 +118,13 @@ export function createDeterministicUltrasoundAppearanceField({
   const {widthPx,heightPx}=sourceField;
   const tissueClasses=sourceField.baseTissueClasses||sourceField.tissueClasses||null;
   const structureIds=sourceField.baseStructureIds||sourceField.structureIds||null;
+  const seedCache=new Map();
   if(tissueClasses&&tissueClasses.length!==sourceField.pixels.length) throw new RangeError('tissue class dimensions do not match');
   if(structureIds&&structureIds.length!==sourceField.pixels.length) throw new RangeError('structure id dimensions do not match');
   const toneMapped=sourceField.pixels.map((value,index)=>{
     const y=Math.floor(index/widthPx);
     const tissueValue=tissueMap(toneMap(value,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
-    return coherentSpeckleMap(tissueValue,index,sourceField,scanPlane,structureIds,profile);
+    return coherentSpeckleMap(tissueValue,index,sourceField,scanPlane,structureIds,profile,seedCache);
   });
   const pixels=toneMapped.map((value,index)=>{
     const y=Math.floor(index/widthPx);

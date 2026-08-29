@@ -101,9 +101,12 @@ export class RegionalTrainerEngine {
       dataset: this.dataset,
       scanPlane: this.scanPlane,
       seed: "trainer-a4-acb-sandbox",
-      widthPx: 160,
-      heightPx: 192,
-      elevationalSamples: 3,
+      // Interactive preview budget: the display interpolates this deterministic
+      // field. One central acquisition keeps gestures responsive; the canonical
+      // physics path and replay semantics remain unchanged.
+      widthPx: 128,
+      heightPx: 144,
+      elevationalSamples: 1,
       frequencyMHz: 12,
       focusDepthMm: i.focusDepthMm,
       dynamicRangeDb: i.dynamicRangeDb,

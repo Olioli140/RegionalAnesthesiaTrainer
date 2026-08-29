@@ -1,17 +1,36 @@
 const clamp01=(value)=>Math.max(0,Math.min(1,value));
 
 export const ULTRASOUND_APPEARANCE_PROFILE=Object.freeze({
-  A6_ADDUCTOR_CANAL_V1:'A6_ADDUCTOR_CANAL_V1'
+  A6_ADDUCTOR_CANAL_V1:'A6_ADDUCTOR_CANAL_V1',
+  A6_ADDUCTOR_CANAL_V2:'A6_ADDUCTOR_CANAL_V2'
+});
+
+const BASE_PROFILE=Object.freeze({
+  blackLevel:0.025,
+  gain:1.08,
+  gamma:0.86,
+  deepGain:0.12,
+  contrast:1.12,
+  axialSmoothing:0.08
+});
+
+const TISSUE_SIGNATURES=Object.freeze({
+  skin:Object.freeze({gain:1.08,gamma:0.94}),
+  fat:Object.freeze({gain:1.00,gamma:1.03}),
+  fascia:Object.freeze({gain:1.24,gamma:0.86}),
+  muscle:Object.freeze({gain:0.91,gamma:1.08}),
+  artery:Object.freeze({gain:0.48,gamma:1.18}),
+  vein:Object.freeze({gain:0.40,gamma:1.22}),
+  nerve:Object.freeze({gain:1.18,gamma:0.90}),
+  other:Object.freeze({gain:1,gamma:1})
 });
 
 const PROFILES=Object.freeze({
   [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V1]:Object.freeze({
-    blackLevel:0.025,
-    gain:1.08,
-    gamma:0.86,
-    deepGain:0.12,
-    contrast:1.12,
-    axialSmoothing:0.08
+    ...BASE_PROFILE,tissueSignatures:null
+  }),
+  [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V2]:Object.freeze({
+    ...BASE_PROFILE,tissueSignatures:TISSUE_SIGNATURES
   })
 });
 
@@ -29,17 +48,25 @@ function toneMap(value,depthFraction,profile){
   return clamp01((curved-.5)*profile.contrast+.5);
 }
 
+function tissueMap(value,tissueClass,profile){
+  if(!profile.tissueSignatures||!tissueClass) return value;
+  const signature=profile.tissueSignatures[tissueClass]||profile.tissueSignatures.other;
+  return clamp01(Math.pow(clamp01(value*signature.gain),signature.gamma));
+}
+
 export function createDeterministicUltrasoundAppearanceField({
   sourceField,
-  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V1
+  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V2
 }={}){
   validateField(sourceField);
   const profile=PROFILES[profileId];
   if(!profile) throw new RangeError(`unknown ultrasound appearance profile ${profileId}`);
   const {widthPx,heightPx}=sourceField;
+  const tissueClasses=sourceField.baseTissueClasses||sourceField.tissueClasses||null;
+  if(tissueClasses&&tissueClasses.length!==sourceField.pixels.length) throw new RangeError('tissue class dimensions do not match');
   const toneMapped=sourceField.pixels.map((value,index)=>{
     const y=Math.floor(index/widthPx);
-    return toneMap(value,(y+.5)/heightPx,profile);
+    return tissueMap(toneMap(value,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
   });
   const pixels=toneMapped.map((value,index)=>{
     const y=Math.floor(index/widthPx);
@@ -49,7 +76,7 @@ export function createDeterministicUltrasoundAppearanceField({
   });
   return Object.freeze({
     kind:'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-    version:'A6.1',
+    version:profile.tissueSignatures?'A6.2':'A6.1',
     profileId,
     sourceKind:sourceField.kind,
     widthPx:sourceField.widthPx,
@@ -57,6 +84,8 @@ export function createDeterministicUltrasoundAppearanceField({
     widthMm:sourceField.widthMm,
     depthMm:sourceField.depthMm,
     calibrationStatus:'ENGINEERING_CALIBRATION',
+    tissueSignatureStatus:profile.tissueSignatures?'TISSUE_CLASS_MAPPED':'DISABLED',
+    tissueClasses:tissueClasses?Object.freeze(Array.from(tissueClasses)):null,
     pixels:Object.freeze(pixels)
   });
 }

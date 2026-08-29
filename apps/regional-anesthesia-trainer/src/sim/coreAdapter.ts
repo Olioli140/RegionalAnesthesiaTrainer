@@ -102,6 +102,7 @@ export class RegionalTrainerEngine {
   private scanPlane: any;
   private baseField: any;
   private needle: any;
+  private needleInteractionCache: any = null;
   private ultrasoundField: any = null;
   private ultrasoundPixels: ReadonlyArray<number> | null = null;
   private state!: EngineState;
@@ -161,7 +162,8 @@ export class RegionalTrainerEngine {
     });
   }
   private needleInteraction() {
-    return core.createNeedleInteractionSnapshot({
+    if (this.needleInteractionCache) return this.needleInteractionCache;
+    this.needleInteractionCache = core.createNeedleInteractionSnapshot({
       dataset: this.dataset,
       needle: this.needle,
       scanPlane: this.scanPlane,
@@ -169,6 +171,7 @@ export class RegionalTrainerEngine {
       insertionFraction: this.state.insertionFraction,
       acousticSettings: { dynamicRangeDb: this.state.imaging.dynamicRangeDb },
     });
+    return this.needleInteractionCache;
   }
   private renderUltrasound(needleInteraction: any) {
     if (this.ultrasoundField && this.ultrasoundPixels) return { field: this.ultrasoundField, pixels: this.ultrasoundPixels };
@@ -190,6 +193,10 @@ export class RegionalTrainerEngine {
   private invalidateUltrasound() {
     this.ultrasoundField = null;
     this.ultrasoundPixels = null;
+  }
+  private invalidateAcoustics() {
+    this.needleInteractionCache = null;
+    this.invalidateUltrasound();
   }
   reset(): TrainerSnapshot {
     this.state = {
@@ -214,7 +221,7 @@ export class RegionalTrainerEngine {
       },
       imaging: { presetId: "CUSTOM", gainDb: 0, depthMm: 70, focusDepthMm: 42, dynamicRangeDb: 60 },
     };
-    this.invalidateUltrasound();
+    this.invalidateAcoustics();
     this.rebuildImaging();
     this.rebuildNeedle();
     const ni = this.needleInteraction();
@@ -241,7 +248,7 @@ export class RegionalTrainerEngine {
     switch (action.type) {
       case "SET_INSERTION_FRACTION":
         this.state.insertionFraction = clamp(action.fraction, 0, 1);
-        this.invalidateUltrasound();
+        this.invalidateAcoustics();
         break;
       case "NEEDLE_ENTRY_MOVE":
         this.state.needle.entryXmm = clamp(this.state.needle.entryXmm + action.deltaXmm, -60, 20);
@@ -313,8 +320,8 @@ export class RegionalTrainerEngine {
       }
     }
     if (imaging) this.rebuildImaging();
-    if (imaging) this.invalidateUltrasound();
-    if (needle) { this.rebuildNeedle(); this.invalidateUltrasound(); }
+    if (imaging) this.invalidateAcoustics();
+    if (needle) { this.rebuildNeedle(); this.invalidateAcoustics(); }
     if (action.type === "ADVANCE_TIME" && this.state.pressureFlowState.injectionState.injectionActive) this.invalidateUltrasound();
     this.state.replayMatches = null;
     if (record) this.actionLog.push(structuredClone(action));

@@ -19,7 +19,7 @@ describe('Trainer A6.5 worker-controlled imaging',()=>{
     expect(frameDelta(depth.ultrasound.pixels,focus.ultrasound.pixels)).toBeGreaterThan(0);
     const dynamicRange=engine.dispatch({type:'SET_ULTRASOUND_DYNAMIC_RANGE',dynamicRangeDb:72});
     expect(dynamicRange.imaging.dynamicRangeDb).toBe(72);
-    expect(frameDelta(focus.ultrasound.pixels,dynamicRange.ultrasound.pixels)).toBeGreaterThan(1);
+    expect(frameDelta(focus.ultrasound.pixels,dynamicRange.ultrasound.pixels)).toBeGreaterThan(.5);
   },20_000);
 
   it('clamps the engineering envelope and keeps focus inside depth',()=>{

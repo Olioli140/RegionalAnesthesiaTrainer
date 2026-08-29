@@ -51,7 +51,10 @@ describe('RegionalTrainerEngine', () => {
       needleAngleResponseStatus: 'CANONICAL_NEEDLE_CORE',
       posteriorArtifactStatus: 'VESSEL_ENHANCEMENT_FASCIA_SHADOW',
       operatorControlStatus: 'WORKER_CONTROLLED',
-      gainDb: 0
+      gainDb: 0,
+      trainerDisplay: 'A6.7.1_TISSUE_WINDOWED_SPECKLE'
     });
+    expect(first.ultrasound.pixels.every(value => value >= 0 && value <= 1)).toBe(true);
+    expect(first.ultrasound.pixels.filter(value => value < 0.01 || value > 0.9).length).toBe(0);
   }, 10_000);
 });

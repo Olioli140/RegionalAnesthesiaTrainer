@@ -31,6 +31,11 @@ const core = {
 const CASE_ID = "ACB_TECHNICAL_SANDBOX_V1" as const;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const rad = (d: number) => (d * Math.PI) / 180;
+const IMAGING_PRESETS = Object.freeze({
+  NERVE_DETAIL: Object.freeze({ gainDb: 3, depthMm: 60, focusDepthMm: 40, dynamicRangeDb: 58 }),
+  NEEDLE_VISIBILITY: Object.freeze({ gainDb: 5, depthMm: 70, focusDepthMm: 42, dynamicRangeDb: 54 }),
+  OVERVIEW: Object.freeze({ gainDb: 0, depthMm: 90, focusDepthMm: 55, dynamicRangeDb: 68 }),
+});
 interface EngineState {
   insertionFraction: number;
   timeSec: number;
@@ -52,6 +57,7 @@ interface EngineState {
     lengthMm: number;
   };
   imaging: {
+    presetId: "NERVE_DETAIL" | "NEEDLE_VISIBILITY" | "OVERVIEW" | "CUSTOM";
     gainDb: number;
     depthMm: number;
     focusDepthMm: number;
@@ -147,7 +153,7 @@ export class RegionalTrainerEngine {
         outOfPlaneAngleDeg: 0,
         lengthMm: 53.2,
       },
-      imaging: { gainDb: 0, depthMm: 70, focusDepthMm: 42, dynamicRangeDb: 60 },
+      imaging: { presetId: "CUSTOM", gainDb: 0, depthMm: 70, focusDepthMm: 42, dynamicRangeDb: 60 },
     };
     this.rebuildImaging();
     this.rebuildNeedle();
@@ -214,19 +220,27 @@ export class RegionalTrainerEngine {
         imaging = true;
         break;
       case "SET_ULTRASOUND_GAIN":
+        this.state.imaging.presetId = "CUSTOM";
         this.state.imaging.gainDb = clamp(action.gainDb, -18, 18);
         break;
       case "SET_ULTRASOUND_DEPTH":
+        this.state.imaging.presetId = "CUSTOM";
         this.state.imaging.depthMm = clamp(action.depthMm, 45, 100);
         this.state.imaging.focusDepthMm = clamp(this.state.imaging.focusDepthMm, 10, this.state.imaging.depthMm - 5);
         imaging = true;
         break;
       case "SET_ULTRASOUND_FOCUS":
+        this.state.imaging.presetId = "CUSTOM";
         this.state.imaging.focusDepthMm = clamp(action.focusDepthMm, 10, this.state.imaging.depthMm - 5);
         imaging = true;
         break;
       case "SET_ULTRASOUND_DYNAMIC_RANGE":
+        this.state.imaging.presetId = "CUSTOM";
         this.state.imaging.dynamicRangeDb = clamp(action.dynamicRangeDb, 40, 80);
+        imaging = true;
+        break;
+      case "APPLY_ULTRASOUND_PRESET":
+        this.state.imaging = { presetId: action.presetId, ...IMAGING_PRESETS[action.presetId] };
         imaging = true;
         break;
       default: {

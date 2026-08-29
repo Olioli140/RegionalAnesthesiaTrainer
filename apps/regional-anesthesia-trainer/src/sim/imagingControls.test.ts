@@ -28,8 +28,19 @@ describe('Trainer A6.5 worker-controlled imaging',()=>{
     engine.dispatch({type:'SET_ULTRASOUND_DEPTH',depthMm:45});
     engine.dispatch({type:'SET_ULTRASOUND_FOCUS',focusDepthMm:999});
     const snapshot=engine.dispatch({type:'SET_ULTRASOUND_DYNAMIC_RANGE',dynamicRangeDb:-999});
-    expect(snapshot.imaging).toEqual({gainDb:18,depthMm:45,focusDepthMm:40,dynamicRangeDb:40});
+    expect(snapshot.imaging).toEqual({presetId:'CUSTOM',gainDb:18,depthMm:45,focusDepthMm:40,dynamicRangeDb:40});
   },15_000);
+
+  it('applies canonical imaging presets and returns to custom on manual adjustment',()=>{
+    const engine=new RegionalTrainerEngine();
+    const nerve=engine.dispatch({type:'APPLY_ULTRASOUND_PRESET',presetId:'NERVE_DETAIL'});
+    expect(nerve.imaging).toEqual({presetId:'NERVE_DETAIL',gainDb:3,depthMm:60,focusDepthMm:40,dynamicRangeDb:58});
+    const needle=engine.dispatch({type:'APPLY_ULTRASOUND_PRESET',presetId:'NEEDLE_VISIBILITY'});
+    expect(needle.imaging).toEqual({presetId:'NEEDLE_VISIBILITY',gainDb:5,depthMm:70,focusDepthMm:42,dynamicRangeDb:54});
+    const overview=engine.dispatch({type:'APPLY_ULTRASOUND_PRESET',presetId:'OVERVIEW'});
+    expect(overview.imaging).toEqual({presetId:'OVERVIEW',gainDb:0,depthMm:90,focusDepthMm:55,dynamicRangeDb:68});
+    expect(engine.dispatch({type:'SET_ULTRASOUND_GAIN',gainDb:1}).imaging.presetId).toBe('CUSTOM');
+  },20_000);
 
   it('replays imaging adjustments deterministically',()=>{
     const engine=new RegionalTrainerEngine();

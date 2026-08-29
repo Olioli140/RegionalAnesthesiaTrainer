@@ -31,6 +31,39 @@ const core = {
 const CASE_ID = "ACB_TECHNICAL_SANDBOX_V1" as const;
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const rad = (d: number) => (d * Math.PI) / 180;
+const displayNoise = (x: number, y: number) => {
+  let h = Math.imul(x + 17, 374761393) ^ Math.imul(y + 31, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 0xffffffff;
+};
+function createTrainerDisplayPixels(field: any) {
+  const { widthPx: width, heightPx: height } = field;
+  const tissue = field.tissueClasses as Array<string | null> | null;
+  const mapped = field.pixels.map((raw: number, index: number) => {
+    const x = index % width, y = Math.floor(index / width), kind = tissue?.[index] ?? null;
+    const fine = displayNoise(x, y) - 0.5;
+    if (!kind) {
+      const depth = y / Math.max(1, height - 1);
+      return clamp(0.17 + 0.07 * depth + fine * 0.12, 0.06, 0.36);
+    }
+    const range = kind === "artery" || kind === "vein" ? [0.025, 0.28]
+      : kind === "fascia" ? [0.24, 0.72]
+      : kind === "nerve" ? [0.20, 0.68]
+      : kind === "muscle" ? [0.10, 0.58]
+      : [0.12, 0.62];
+    return clamp(range[0] + raw * (range[1] - range[0] + 0.18) + fine * 0.055, 0, 0.88);
+  });
+  const softened = mapped.map((value: number, index: number) => {
+    const x = index % width, y = Math.floor(index / width);
+    let sum = value * 4, weight = 4;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const xx = x + dx, yy = y + dy;
+      if (xx >= 0 && xx < width && yy >= 0 && yy < height) { sum += mapped[yy * width + xx]; weight++; }
+    }
+    return clamp(sum / weight + (displayNoise(x + 911, y + 353) - 0.5) * 0.035, 0, 1);
+  });
+  return Object.freeze(softened);
+}
 const IMAGING_PRESETS = Object.freeze({
   NERVE_DETAIL: Object.freeze({ gainDb: 3, depthMm: 60, focusDepthMm: 40, dynamicRangeDb: 58 }),
   NEEDLE_VISIBILITY: Object.freeze({ gainDb: 5, depthMm: 70, focusDepthMm: 42, dynamicRangeDb: 54 }),
@@ -370,7 +403,7 @@ export class RegionalTrainerEngine {
       ultrasound: {
         widthPx: us.widthPx,
         heightPx: us.heightPx,
-        pixels: Array.from(us.pixels),
+        pixels: Array.from(createTrainerDisplayPixels(us)),
       },
       developer: {
         appearance: {
@@ -385,6 +418,7 @@ export class RegionalTrainerEngine {
           posteriorArtifactStatus: us.posteriorArtifactStatus,
           operatorControlStatus: us.operatorControlStatus,
           gainDb: us.gainDb,
+          trainerDisplay: "A6.7.1_TISSUE_WINDOWED_SPECKLE",
         },
         imaging: { ...i },
         probe: { ...p, scanPlane: this.scanPlane },

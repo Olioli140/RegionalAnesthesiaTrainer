@@ -42,10 +42,11 @@ describe('RegionalTrainerEngine', () => {
     expect(first.ultrasound).toEqual(second.ultrasound);
     expect((first.developer as any).appearance).toEqual({
       kind: 'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-      version: 'A6.2',
-      profileId: 'A6_ADDUCTOR_CANAL_V2',
+      version: 'A6.3',
+      profileId: 'A6_ADDUCTOR_CANAL_V3',
       sourceKind: 'DETERMINISTIC_ULTRASOUND_FLUID_OVERLAY_FIELD',
-      tissueSignatureStatus: 'TISSUE_CLASS_MAPPED'
+      tissueSignatureStatus: 'TISSUE_CLASS_MAPPED',
+      poseContinuityStatus: 'WORLD_COORDINATE_COHERENT'
     });
   });
 });

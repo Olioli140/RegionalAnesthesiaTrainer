@@ -2,7 +2,8 @@ const clamp01=(value)=>Math.max(0,Math.min(1,value));
 
 export const ULTRASOUND_APPEARANCE_PROFILE=Object.freeze({
   A6_ADDUCTOR_CANAL_V1:'A6_ADDUCTOR_CANAL_V1',
-  A6_ADDUCTOR_CANAL_V2:'A6_ADDUCTOR_CANAL_V2'
+  A6_ADDUCTOR_CANAL_V2:'A6_ADDUCTOR_CANAL_V2',
+  A6_ADDUCTOR_CANAL_V3:'A6_ADDUCTOR_CANAL_V3'
 });
 
 const BASE_PROFILE=Object.freeze({
@@ -31,8 +32,48 @@ const PROFILES=Object.freeze({
   }),
   [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V2]:Object.freeze({
     ...BASE_PROFILE,tissueSignatures:TISSUE_SIGNATURES
+  }),
+  [ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V3]:Object.freeze({
+    ...BASE_PROFILE,tissueSignatures:TISSUE_SIGNATURES,
+    worldSpeckle:Object.freeze({seed:'a6-adductor-canal-world-speckle-v1',correlationLengthMm:2.8,strength:0.10})
   })
 });
+
+function hash32(text){
+  let hash=2166136261;
+  for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,16777619);}
+  return hash>>>0;
+}
+const smooth=(value)=>value*value*(3-2*value);
+const lerp=(a,b,t)=>a+(b-a)*t;
+function lattice(seed,x,y,z){
+  let hash=seed;
+  hash=Math.imul(hash^(x|0),16777619);
+  hash=Math.imul(hash^(y|0),16777619);
+  hash=Math.imul(hash^(z|0),16777619);
+  hash^=hash>>>16;hash=Math.imul(hash,0x7feb352d);hash^=hash>>>15;hash=Math.imul(hash,0x846ca68b);hash^=hash>>>16;
+  return (hash>>>0)/0xffffffff*2-1;
+}
+function worldNoise(seed,point,correlationLengthMm){
+  const gx=point.x/correlationLengthMm,gy=point.y/correlationLengthMm,gz=point.z/correlationLengthMm;
+  const x0=Math.floor(gx),y0=Math.floor(gy),z0=Math.floor(gz);
+  const tx=smooth(gx-x0),ty=smooth(gy-y0),tz=smooth(gz-z0);
+  const layer=(z)=>lerp(
+    lerp(lattice(seed,x0,y0,z),lattice(seed,x0+1,y0,z),tx),
+    lerp(lattice(seed,x0,y0+1,z),lattice(seed,x0+1,y0+1,z),tx),ty
+  );
+  return lerp(layer(z0),layer(z0+1),tz);
+}
+function worldPointForPixel(index,sourceField,scanPlane){
+  const x=index%sourceField.widthPx,y=Math.floor(index/sourceField.widthPx);
+  const lateral=-sourceField.widthMm/2+(x+.5)*sourceField.widthMm/sourceField.widthPx;
+  const depth=(y+.5)*sourceField.depthMm/sourceField.heightPx;
+  return {
+    x:scanPlane.originMm.x+scanPlane.lateralAxis.x*lateral+scanPlane.depthAxis.x*depth,
+    y:scanPlane.originMm.y+scanPlane.lateralAxis.y*lateral+scanPlane.depthAxis.y*depth,
+    z:scanPlane.originMm.z+scanPlane.lateralAxis.z*lateral+scanPlane.depthAxis.z*depth
+  };
+}
 
 function validateField(field){
   if(!field||!Number.isInteger(field.widthPx)||!Number.isInteger(field.heightPx)||!Array.isArray(field.pixels)){
@@ -54,19 +95,36 @@ function tissueMap(value,tissueClass,profile){
   return clamp01(Math.pow(clamp01(value*signature.gain),signature.gamma));
 }
 
+function coherentSpeckleMap(value,index,sourceField,scanPlane,structureIds,profile,seedCache){
+  if(!profile.worldSpeckle) return value;
+  if(!scanPlane?.originMm||!scanPlane?.lateralAxis||!scanPlane?.depthAxis) throw new TypeError('scanPlane is required for pose-coherent appearance');
+  const settings=profile.worldSpeckle;
+  const point=worldPointForPixel(index,sourceField,scanPlane);
+  const structureKey=structureIds?.[index]||'background';
+  let seed=seedCache.get(structureKey);
+  if(seed===undefined){seed=hash32(`${settings.seed}|${structureKey}`);seedCache.set(structureKey,seed);}
+  const noise=worldNoise(seed,point,settings.correlationLengthMm);
+  return clamp01(value*(1+noise*settings.strength));
+}
+
 export function createDeterministicUltrasoundAppearanceField({
   sourceField,
-  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V2
+  scanPlane,
+  profileId=ULTRASOUND_APPEARANCE_PROFILE.A6_ADDUCTOR_CANAL_V3
 }={}){
   validateField(sourceField);
   const profile=PROFILES[profileId];
   if(!profile) throw new RangeError(`unknown ultrasound appearance profile ${profileId}`);
   const {widthPx,heightPx}=sourceField;
   const tissueClasses=sourceField.baseTissueClasses||sourceField.tissueClasses||null;
+  const structureIds=sourceField.baseStructureIds||sourceField.structureIds||null;
+  const seedCache=new Map();
   if(tissueClasses&&tissueClasses.length!==sourceField.pixels.length) throw new RangeError('tissue class dimensions do not match');
+  if(structureIds&&structureIds.length!==sourceField.pixels.length) throw new RangeError('structure id dimensions do not match');
   const toneMapped=sourceField.pixels.map((value,index)=>{
     const y=Math.floor(index/widthPx);
-    return tissueMap(toneMap(value,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
+    const tissueValue=tissueMap(toneMap(value,(y+.5)/heightPx,profile),tissueClasses?.[index],profile);
+    return coherentSpeckleMap(tissueValue,index,sourceField,scanPlane,structureIds,profile,seedCache);
   });
   const pixels=toneMapped.map((value,index)=>{
     const y=Math.floor(index/widthPx);
@@ -76,7 +134,7 @@ export function createDeterministicUltrasoundAppearanceField({
   });
   return Object.freeze({
     kind:'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-    version:profile.tissueSignatures?'A6.2':'A6.1',
+    version:profile.worldSpeckle?'A6.3':profile.tissueSignatures?'A6.2':'A6.1',
     profileId,
     sourceKind:sourceField.kind,
     widthPx:sourceField.widthPx,
@@ -85,6 +143,7 @@ export function createDeterministicUltrasoundAppearanceField({
     depthMm:sourceField.depthMm,
     calibrationStatus:'ENGINEERING_CALIBRATION',
     tissueSignatureStatus:profile.tissueSignatures?'TISSUE_CLASS_MAPPED':'DISABLED',
+    poseContinuityStatus:profile.worldSpeckle?'WORLD_COORDINATE_COHERENT':'DISABLED',
     tissueClasses:tissueClasses?Object.freeze(Array.from(tissueClasses)):null,
     pixels:Object.freeze(pixels)
   });

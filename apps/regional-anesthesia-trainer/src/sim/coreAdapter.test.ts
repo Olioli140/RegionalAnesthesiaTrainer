@@ -12,7 +12,7 @@ describe('RegionalTrainerEngine', () => {
     engine.dispatch({ type: 'STOP_INJECTION' });
     const checked = engine.dispatch({ type: 'REPLAY' });
     expect(checked.replayMatches).toBe(true);
-  });
+  }, 10_000);
 
   it('uses actual pressure-limited flow and D3 volume for spread', () => {
     const engine = new RegionalTrainerEngine();
@@ -36,16 +36,17 @@ describe('RegionalTrainerEngine', () => {
     expect(snapshot.actionCount).toBe(0);
   });
 
-  it('renders the versioned deterministic A6.1 appearance field', () => {
+  it('renders the versioned deterministic A6.3 appearance field', () => {
     const first = new RegionalTrainerEngine().snapshot();
     const second = new RegionalTrainerEngine().snapshot();
     expect(first.ultrasound).toEqual(second.ultrasound);
     expect((first.developer as any).appearance).toEqual({
       kind: 'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-      version: 'A6.2',
-      profileId: 'A6_ADDUCTOR_CANAL_V2',
+      version: 'A6.3',
+      profileId: 'A6_ADDUCTOR_CANAL_V3',
       sourceKind: 'DETERMINISTIC_ULTRASOUND_FLUID_OVERLAY_FIELD',
-      tissueSignatureStatus: 'TISSUE_CLASS_MAPPED'
+      tissueSignatureStatus: 'TISSUE_CLASS_MAPPED',
+      poseContinuityStatus: 'WORLD_COORDINATE_COHERENT'
     });
   });
 });

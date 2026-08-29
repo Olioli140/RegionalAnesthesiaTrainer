@@ -41,6 +41,7 @@ export interface InjectionSnapshot {
   depotCount: number;
 }
 export interface ImagingSnapshot {
+  presetId: 'NERVE_DETAIL' | 'NEEDLE_VISIBILITY' | 'OVERVIEW' | 'CUSTOM';
   gainDb: number;
   depthMm: number;
   focusDepthMm: number;
@@ -63,6 +64,7 @@ export type TrainerAction =
   | { type: 'SET_ULTRASOUND_DEPTH'; depthMm: number }
   | { type: 'SET_ULTRASOUND_FOCUS'; focusDepthMm: number }
   | { type: 'SET_ULTRASOUND_DYNAMIC_RANGE'; dynamicRangeDb: number }
+  | { type: 'APPLY_ULTRASOUND_PRESET'; presetId: 'NERVE_DETAIL' | 'NEEDLE_VISIBILITY' | 'OVERVIEW' }
   | { type: 'ASPIRATE' }
   | { type: 'START_INJECTION' }
   | { type: 'STOP_INJECTION' }

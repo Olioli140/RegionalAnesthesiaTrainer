@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import type { UltrasoundFrame } from '../protocol';
+import type { ImagingSnapshot, UltrasoundFrame } from '../protocol';
 
-export function UltrasoundCanvas({ frame }: { frame: UltrasoundFrame }) {
+export function UltrasoundCanvas({ frame, imaging }: { frame: UltrasoundFrame; imaging: ImagingSnapshot }) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -23,5 +23,12 @@ export function UltrasoundCanvas({ frame }: { frame: UltrasoundFrame }) {
     ctx.putImageData(image, 0, 0);
   }, [frame]);
 
-  return <canvas ref={ref} className="ultrasound-canvas" aria-label="Synthetic ultrasound B-mode" />;
+  const focusPercent=Math.max(0,Math.min(100,imaging.focusDepthMm/imaging.depthMm*100));
+  return <div className="ultrasound-viewport">
+    <canvas ref={ref} className="ultrasound-canvas" aria-label="Synthetic ultrasound B-mode" />
+    <div className="depth-scale" aria-label={`Depth scale 0 to ${imaging.depthMm} millimeters`}>
+      <span style={{top:'0%'}}>0</span><span style={{top:'50%'}}>{Math.round(imaging.depthMm/2)}</span><span style={{top:'100%'}}>{imaging.depthMm}</span>
+    </div>
+    <div className="focus-marker" style={{top:`${focusPercent}%`}} aria-label={`Focus ${imaging.focusDepthMm} millimeters`}><i/><span>F</span></div>
+  </div>;
 }

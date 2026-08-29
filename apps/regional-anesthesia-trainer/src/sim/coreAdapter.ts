@@ -102,6 +102,8 @@ export class RegionalTrainerEngine {
   private scanPlane: any;
   private baseField: any;
   private needle: any;
+  private ultrasoundField: any = null;
+  private ultrasoundPixels: ReadonlyArray<number> | null = null;
   private state!: EngineState;
   private actionLog: TrainerAction[] = [];
   constructor() {
@@ -168,6 +170,27 @@ export class RegionalTrainerEngine {
       acousticSettings: { dynamicRangeDb: this.state.imaging.dynamicRangeDb },
     });
   }
+  private renderUltrasound(needleInteraction: any) {
+    if (this.ultrasoundField && this.ultrasoundPixels) return { field: this.ultrasoundField, pixels: this.ultrasoundPixels };
+    const i = this.state.imaging;
+    const fluid = core.createFluidUltrasoundOverlay({
+      baseField: needleInteraction.acoustics,
+      spreadState: this.state.spreadState,
+      scanPlane: this.scanPlane,
+      dynamicRangeDb: i.dynamicRangeDb,
+    });
+    this.ultrasoundField = core.createDeterministicUltrasoundAppearanceField({
+      sourceField: fluid,
+      scanPlane: this.scanPlane,
+      operatorSettings: { gainDb: i.gainDb },
+    });
+    this.ultrasoundPixels = createTrainerDisplayPixels(this.ultrasoundField);
+    return { field: this.ultrasoundField, pixels: this.ultrasoundPixels! };
+  }
+  private invalidateUltrasound() {
+    this.ultrasoundField = null;
+    this.ultrasoundPixels = null;
+  }
   reset(): TrainerSnapshot {
     this.state = {
       insertionFraction: 0.25,
@@ -191,6 +214,7 @@ export class RegionalTrainerEngine {
       },
       imaging: { presetId: "CUSTOM", gainDb: 0, depthMm: 70, focusDepthMm: 42, dynamicRangeDb: 60 },
     };
+    this.invalidateUltrasound();
     this.rebuildImaging();
     this.rebuildNeedle();
     const ni = this.needleInteraction();
@@ -217,6 +241,7 @@ export class RegionalTrainerEngine {
     switch (action.type) {
       case "SET_INSERTION_FRACTION":
         this.state.insertionFraction = clamp(action.fraction, 0, 1);
+        this.invalidateUltrasound();
         break;
       case "NEEDLE_ENTRY_MOVE":
         this.state.needle.entryXmm = clamp(this.state.needle.entryXmm + action.deltaXmm, -60, 20);
@@ -258,6 +283,7 @@ export class RegionalTrainerEngine {
       case "SET_ULTRASOUND_GAIN":
         this.state.imaging.presetId = "CUSTOM";
         this.state.imaging.gainDb = clamp(action.gainDb, -18, 18);
+        this.invalidateUltrasound();
         break;
       case "SET_ULTRASOUND_DEPTH":
         this.state.imaging.presetId = "CUSTOM";
@@ -287,7 +313,9 @@ export class RegionalTrainerEngine {
       }
     }
     if (imaging) this.rebuildImaging();
-    if (needle) this.rebuildNeedle();
+    if (imaging) this.invalidateUltrasound();
+    if (needle) { this.rebuildNeedle(); this.invalidateUltrasound(); }
+    if (action.type === "ADVANCE_TIME" && this.state.pressureFlowState.injectionState.injectionActive) this.invalidateUltrasound();
     this.state.replayMatches = null;
     if (record) this.actionLog.push(structuredClone(action));
     return this.snapshot();
@@ -328,17 +356,8 @@ export class RegionalTrainerEngine {
       sol = pf.lastFlowSolution,
       env = sol.environment,
       i = this.state.imaging,
-      fluid = core.createFluidUltrasoundOverlay({
-        baseField: ni.acoustics,
-        spreadState: this.state.spreadState,
-        scanPlane: this.scanPlane,
-        dynamicRangeDb: i.dynamicRangeDb,
-      }),
-      us = core.createDeterministicUltrasoundAppearanceField({
-        sourceField: fluid,
-        scanPlane: this.scanPlane,
-        operatorSettings: { gainDb: i.gainDb },
-      }),
+      rendered = this.renderUltrasound(ni),
+      us = rendered.field,
       tip = core.pointAlongNeedle(this.needle, this.state.insertionFraction),
       rel = core.needleScanPlaneRelation(this.needle, this.scanPlane),
       p = this.state.probe,
@@ -403,7 +422,7 @@ export class RegionalTrainerEngine {
       ultrasound: {
         widthPx: us.widthPx,
         heightPx: us.heightPx,
-        pixels: Array.from(createTrainerDisplayPixels(us)),
+        pixels: Array.from(rendered.pixels),
       },
       developer: {
         appearance: {

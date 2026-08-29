@@ -20,19 +20,23 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<TrainerSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flow, setFlow] = useState(6);
+  const [busy, setBusy] = useState(false);
   const mounted = useRef(true);
-  const send = (action: TrainerAction) =>
+  const send = (action: TrainerAction) => {
+    setBusy(true);
     worker.postMessage({
       protocolVersion: TRAINER_PROTOCOL_VERSION,
       kind: "ACTION",
       action,
     } satisfies WorkerRequest);
+  };
   useEffect(() => {
     mounted.current = true;
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       if (!mounted.current) return;
       if (e.data.kind === "ERROR") setError(e.data.message);
       else {
+        setBusy(false);
         setError(null);
         setSnapshot(e.data.snapshot);
         setFlow(e.data.snapshot.requestedFlowMlPerMin);
@@ -69,14 +73,16 @@ export default function App() {
     <main className="app-shell">
       <header>
         <div>
-          <p className="eyebrow">Regional Anesthesia Trainer · A6.6</p>
+          <p className="eyebrow">Regional Anesthesia Trainer · A6.7</p>
           <h1>Adductor Canal Direct Manipulation Sandbox</h1>
           <p className="subtitle">
             Manipulate probe, imaging and needle directly. Every gesture emits
             canonical TrainerActions; worker/core remains simulation truth.
           </p>
         </div>
-        <div className="status">Worker protocol {snapshot.protocolVersion}</div>
+        <div className={`status worker-status ${busy ? "busy" : ""}`} aria-live="polite">
+          <i /> {busy ? "Bild wird aktualisiert…" : "Bereit"}
+        </div>
       </header>
       {error && <div className="error">{error}</div>}
       <section className="procedure-strip">
@@ -98,13 +104,13 @@ export default function App() {
       </section>
       <section className="workspace">
         <aside className="panel controls">
-          <ControlGroup title="Direct manipulation">
+          <ControlGroup title="Sonde und Nadel">
             <p className="muted">
-              Probe: drag left/right to slide, up/down for pressure, mouse wheel
-              to rotate. Needle: drag entry point; drag + handle for trajectory.
+              Sonde im Modell ziehen: seitlich verschieben, vertikal drücken,
+              mit dem Mausrad drehen. Nadelpunkte direkt ziehen.
             </p>
           </ControlGroup>
-          <ControlGroup title="Ultrasound imaging">
+          <ControlGroup title="Ultraschallbild">
             <div className="preset-row" aria-label="Ultrasound presets">
               <PresetButton id="NERVE_DETAIL" label="Nerve" active={snapshot.imaging.presetId==='NERVE_DETAIL'} onAction={send}/>
               <PresetButton id="NEEDLE_VISIBILITY" label="Needle" active={snapshot.imaging.presetId==='NEEDLE_VISIBILITY'} onAction={send}/>
@@ -220,7 +226,7 @@ export default function App() {
             </label>
           </ControlGroup>
           <ControlGroup title="Injection">
-            <button className="wide" onClick={() => send({ type: "ASPIRATE" })}>
+            <button className="wide" onClick={() => send({ type: "ASPIRATE" })} disabled={busy}>
               Aspirate {inj.aspiration ? `· ${inj.aspiration}` : ""}
             </button>
             <label>
@@ -232,27 +238,22 @@ export default function App() {
                 step="0.5"
                 value={flow}
                 onChange={(e) => setFlow(Number(e.target.value))}
+                onPointerUp={() => send({ type: "SET_REQUESTED_FLOW", flowMlPerMin: flow })}
+                onKeyUp={() => send({ type: "SET_REQUESTED_FLOW", flowMlPerMin: flow })}
               />
             </label>
-            <button
-              className="wide"
-              onClick={() =>
-                send({ type: "SET_REQUESTED_FLOW", flowMlPerMin: flow })
-              }
-            >
-              Apply requested flow
-            </button>
+            <p className="control-hint">Der Wert wird beim Loslassen übernommen.</p>
             <div className="button-row">
               <button
                 className="primary"
                 onClick={() => send({ type: "START_INJECTION" })}
-                disabled={inj.active}
+                disabled={inj.active || busy}
               >
                 Start injection
               </button>
               <button
                 onClick={() => send({ type: "STOP_INJECTION" })}
-                disabled={!inj.active}
+                disabled={!inj.active || busy}
               >
                 Stop
               </button>
@@ -260,23 +261,26 @@ export default function App() {
             <div className="button-row">
               <button
                 onClick={() => send({ type: "ADVANCE_TIME", deltaSec: 1 })}
+                disabled={busy}
               >
                 Advance +1 s
               </button>
               <button
                 onClick={() => send({ type: "ADVANCE_TIME", deltaSec: 5 })}
+                disabled={busy}
               >
                 Advance +5 s
               </button>
             </div>
           </ControlGroup>
           <div className="button-row">
-            <button onClick={() => send({ type: "REPLAY" })}>
+            <button onClick={() => send({ type: "REPLAY" })} disabled={busy}>
               Verify replay
             </button>
             <button
               className="secondary"
               onClick={() => send({ type: "RESET" })}
+              disabled={busy}
             >
               Reset
             </button>
@@ -321,7 +325,7 @@ export default function App() {
                 {snapshot.imaging.focusDepthMm.toFixed(0)} mm
               </span>
             </div>
-            <UltrasoundCanvas frame={snapshot.ultrasound} imaging={snapshot.imaging} />
+            <UltrasoundCanvas frame={snapshot.ultrasound} imaging={snapshot.imaging} busy={busy} />
             <section className="injection-feedback">
               <div>
                 <p className="eyebrow">Injection feedback</p>

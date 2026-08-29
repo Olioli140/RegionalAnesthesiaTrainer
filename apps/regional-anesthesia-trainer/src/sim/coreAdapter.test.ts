@@ -36,17 +36,20 @@ describe('RegionalTrainerEngine', () => {
     expect(snapshot.actionCount).toBe(0);
   });
 
-  it('renders the versioned deterministic A6.3 appearance field', () => {
+  it('renders the versioned deterministic A6.4 appearance field', () => {
     const first = new RegionalTrainerEngine().snapshot();
     const second = new RegionalTrainerEngine().snapshot();
     expect(first.ultrasound).toEqual(second.ultrasound);
     expect((first.developer as any).appearance).toEqual({
       kind: 'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-      version: 'A6.3',
-      profileId: 'A6_ADDUCTOR_CANAL_V3',
+      version: 'A6.4',
+      profileId: 'A6_ADDUCTOR_CANAL_V4',
       sourceKind: 'DETERMINISTIC_ULTRASOUND_FLUID_OVERLAY_FIELD',
       tissueSignatureStatus: 'TISSUE_CLASS_MAPPED',
-      poseContinuityStatus: 'WORLD_COORDINATE_COHERENT'
+      poseContinuityStatus: 'WORLD_COORDINATE_COHERENT',
+      angleResponseStatus: 'NERVE_FASCIA_ANGLE_DEPENDENT',
+      needleAngleResponseStatus: 'CANONICAL_NEEDLE_CORE',
+      posteriorArtifactStatus: 'VESSEL_ENHANCEMENT_FASCIA_SHADOW'
     });
-  });
+  }, 10_000);
 });

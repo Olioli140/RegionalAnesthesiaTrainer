@@ -16,9 +16,6 @@ export const NERVE_BLOCKS:ReadonlyArray<AtlasBlock>=Object.freeze([
  {id:'rectus',name:'Rectus-Sheath-Block',region:'Rumpf',probe:'quer',target:'Hintere Rektusscheide',position:'Rückenlage.',sono:['M. rectus abdominis','Vordere und hintere Rektusscheide','Peritoneum tief'],orientation:['Sonde transversal paramedian'],tip:'Zwischen M. rectus und hinterer Rektusscheide.',status:'planned'}
 ]);
 
-const usImage=new URL('../assets/atlas-adductor-ultrasound.jpg',import.meta.url).href;
-const probeImage=new URL('../assets/atlas-adductor-probe.jpg',import.meta.url).href;
-
 export function NerveBlockAtlas({onOpenSimulator}:{onOpenSimulator:()=>void}){
  const[query,setQuery]=useState('');
  const[region,setRegion]=useState<'Alle'|AtlasBlock['region']>('Alle');
@@ -26,45 +23,20 @@ export function NerveBlockAtlas({onOpenSimulator}:{onOpenSimulator:()=>void}){
  const selected=NERVE_BLOCKS.find(b=>b.id===selectedId)??NERVE_BLOCKS[0];
  const filtered=useMemo(()=>NERVE_BLOCKS.filter(b=>(region==='Alle'||b.region===region)&&(`${b.name} ${b.target}`.toLowerCase().includes(query.toLowerCase()))),[query,region]);
  return <main className="atlas-shell">
-  <header className="atlas-topbar">
-   <div><p className="eyebrow">Regional Anesthesia Trainer · A6.8</p><h1>Nervenblock-Atlas</h1><p className="subtitle">Ultraschallanatomie, Sondenposition und technische Orientierung.</p></div>
-   <div className="atlas-actions"><button onClick={onOpenSimulator}>← Simulator</button><span className="atlas-online">● Atlas bereit</span></div>
-  </header>
+  <header className="atlas-topbar"><div><p className="eyebrow">Regional Anesthesia Trainer · A6.8</p><h1>Nervenblock-Atlas</h1><p className="subtitle">Ultraschallanatomie, Sondenposition und technische Orientierung.</p></div><div className="atlas-actions"><button onClick={onOpenSimulator}>← Simulator</button><span className="atlas-online">● Atlas bereit</span></div></header>
   <section className="atlas-layout">
-   <aside className="atlas-nav panel">
-    <div className="atlas-nav-title">Referenz</div>
-    <button className="atlas-nav-item active">▣ Nervenblock-Atlas</button>
-    <button className="atlas-nav-item" onClick={onOpenSimulator}>▶ Simulation</button>
-    <div className="atlas-status"><strong>Atlas v1</strong><span>{NERVE_BLOCKS.length} Blocks angelegt</span><span>Adduktorenkanal: Bildset vollständig</span></div>
-   </aside>
-   <section className="atlas-list panel">
-    <div className="atlas-list-head"><h2>Nervenblöcke</h2><span>{filtered.length}</span></div>
-    <input className="atlas-search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Block oder Struktur suchen…" />
-    <select className="atlas-select" value={region} onChange={e=>setRegion(e.target.value as typeof region)}><option>Alle</option><option>Obere Extremität</option><option>Untere Extremität</option><option>Rumpf</option></select>
-    <div className="atlas-block-list">{filtered.map(block=><button key={block.id} className={`atlas-block-card ${block.id===selected.id?'active':''}`} onClick={()=>setSelectedId(block.id)}>
-      <span className="atlas-thumb">{block.status==='ready'?<img src={usImage} alt=""/>:<i>US</i>}</span>
-      <span><strong>{block.name}</strong><small>{block.region} · Sonde {block.probe}</small><small>{block.status==='ready'?'Bildset verfügbar':'Bildset folgt'}</small></span>
-    </button>)}</div>
-   </section>
-   <section className="atlas-detail">
-    <div className="atlas-detail-head"><div><p className="eyebrow">{selected.region}</p><h2>{selected.name}</h2><p>{selected.target}</p></div><button className="primary" onClick={onOpenSimulator}>Zur Simulation</button></div>
-    <div className="atlas-detail-grid">
-     <article className="panel atlas-media-card"><div className="panel-heading"><div><p className="eyebrow">Ultraschallbild</p><h3>{selected.status==='ready'?'Referenzansicht':'Bildset in Vorbereitung'}</h3></div><span>Sonde {selected.probe}</span></div>
-      {selected.status==='ready'?<img className="atlas-us-image" src={usImage} alt="Fotorealistische Ultraschall-Referenz des Adduktorenkanals"/>:<AtlasPlaceholder label={`${selected.name}: Ultraschallbild folgt`}/>} 
-      <p className="atlas-caption">{selected.target}</p>
-     </article>
-     <article className="panel atlas-media-card"><div className="panel-heading"><div><p className="eyebrow">Sondenposition</p><h3>Körperposition und Orientierung</h3></div><span>{selected.position}</span></div>
-      {selected.status==='ready'?<img className="atlas-probe-image" src={probeImage} alt="Sondenposition am medialen Oberschenkel"/>:<AtlasPlaceholder label={`${selected.name}: Sondenfoto folgt`}/>} 
-      <p className="atlas-caption">{selected.position}</p>
-     </article>
-     <article className="panel atlas-info-card"><h3>Anatomische Orientierung</h3><ul>{selected.orientation.map(x=><li key={x}>{x}</li>)}</ul></article>
-     <article className="panel atlas-info-card"><h3>Sono-Merkmale</h3><ul>{selected.sono.map(x=><li key={x}>{x}</li>)}</ul></article>
-     <article className="panel atlas-info-card"><h3>Nadel-Tipp-Ziel</h3><p>{selected.tip}</p><div className="atlas-warning">Ausbildungsreferenz: anatomische Variationen und lokale Standards berücksichtigen.</div></article>
-    </div>
-    <footer className="atlas-footer">Educational / research engineering · kein Medizinprodukt · nicht für Patientenversorgung.</footer>
-   </section>
+   <aside className="atlas-nav panel"><div className="atlas-nav-title">Referenz</div><button className="atlas-nav-item active">▣ Nervenblock-Atlas</button><button className="atlas-nav-item" onClick={onOpenSimulator}>▶ Simulation</button><div className="atlas-status"><strong>Atlas v1</strong><span>{NERVE_BLOCKS.length} Blocks angelegt</span><span>Adduktorenkanal: interaktive Referenz</span></div></aside>
+   <section className="atlas-list panel"><div className="atlas-list-head"><h2>Nervenblöcke</h2><span>{filtered.length}</span></div><input className="atlas-search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Block oder Struktur suchen…"/><select className="atlas-select" value={region} onChange={e=>setRegion(e.target.value as typeof region)}><option>Alle</option><option>Obere Extremität</option><option>Untere Extremität</option><option>Rumpf</option></select><div className="atlas-block-list">{filtered.map(block=><button key={block.id} className={`atlas-block-card ${block.id===selected.id?'active':''}`} onClick={()=>setSelectedId(block.id)}><span className="atlas-thumb"><MiniUltrasound ready={block.status==='ready'}/></span><span><strong>{block.name}</strong><small>{block.region} · Sonde {block.probe}</small><small>{block.status==='ready'?'Referenz verfügbar':'Bildset folgt'}</small></span></button>)}</div></section>
+   <section className="atlas-detail"><div className="atlas-detail-head"><div><p className="eyebrow">{selected.region}</p><h2>{selected.name}</h2><p>{selected.target}</p></div><button className="primary" onClick={onOpenSimulator}>Zur Simulation</button></div><div className="atlas-detail-grid">
+    <article className="panel atlas-media-card"><div className="panel-heading"><div><p className="eyebrow">Ultraschallbild</p><h3>{selected.status==='ready'?'A6.8 Referenzansicht':'Bildset in Vorbereitung'}</h3></div><span>Sonde {selected.probe}</span></div>{selected.status==='ready'?<AdductorUltrasound/>:<AtlasPlaceholder label={`${selected.name}: Ultraschallbild folgt`}/>}<p className="atlas-caption">{selected.target}</p></article>
+    <article className="panel atlas-media-card"><div className="panel-heading"><div><p className="eyebrow">Sondenposition</p><h3>Körperposition und Orientierung</h3></div><span>{selected.position}</span></div>{selected.status==='ready'?<ProbePosition/>:<AtlasPlaceholder label={`${selected.name}: Sondenfoto folgt`}/>}<p className="atlas-caption">{selected.position}</p></article>
+    <article className="panel atlas-info-card"><h3>Anatomische Orientierung</h3><ul>{selected.orientation.map(x=><li key={x}>{x}</li>)}</ul></article><article className="panel atlas-info-card"><h3>Sono-Merkmale</h3><ul>{selected.sono.map(x=><li key={x}>{x}</li>)}</ul></article><article className="panel atlas-info-card"><h3>Nadel-Tipp-Ziel</h3><p>{selected.tip}</p><div className="atlas-warning">Ausbildungsreferenz: anatomische Variationen und lokale Standards berücksichtigen.</div></article>
+   </div><footer className="atlas-footer">Educational / research engineering · kein Medizinprodukt · nicht für Patientenversorgung.</footer></section>
   </section>
  </main>;
 }
 
+function MiniUltrasound({ready}:{ready:boolean}){return <svg viewBox="0 0 72 58" className="atlas-mini-us" aria-hidden="true"><rect width="72" height="58" fill="#030506"/><path d="M0 10 Q18 7 36 11 T72 8 M0 17 Q18 14 36 19 T72 15 M0 31 Q16 25 35 30 T72 27 M0 44 Q18 39 38 45 T72 42" stroke={ready?'#d7dfe3':'#687078'} strokeWidth="2" fill="none" opacity=".8"/><circle cx="47" cy="34" r="9" fill="#060708" stroke="#d4dadd" strokeWidth="2"/><circle cx="58" cy="31" r="4" fill="#b9c0c4" opacity={ready?1:.35}/></svg>}
+function AdductorUltrasound(){return <svg className="atlas-us-image atlas-svg-us" viewBox="0 0 760 420" role="img" aria-label="Deterministische lehrbuchartige Ultraschallreferenz des Adduktorenkanals"><defs><filter id="usNoise"><feTurbulence type="fractalNoise" baseFrequency=".6 .09" numOctaves="3" seed="18"/><feColorMatrix values=".7 0 0 0 0 .7 0 0 0 0 .7 0 0 0 0 0 0 0 .34 0"/></filter><linearGradient id="muscle" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#53585c"/><stop offset="1" stopColor="#111416"/></linearGradient></defs><rect width="760" height="420" fill="#020303"/><rect width="760" height="420" filter="url(#usNoise)" opacity=".55"/><path d="M0 28 C140 10 260 45 390 27 S630 15 760 34" stroke="#e4e7e8" strokeWidth="8" fill="none" opacity=".7"/><path d="M0 70 C170 38 280 90 430 66 S650 55 760 76 L760 180 C650 160 540 190 420 165 S160 170 0 185Z" fill="url(#muscle)" stroke="#9da3a7" strokeWidth="3"/><path d="M0 190 C180 155 260 235 430 205 S660 180 760 218 L760 420 L0 420Z" fill="#121518" stroke="#5f666a" strokeWidth="2"/><ellipse cx="470" cy="255" rx="58" ry="52" fill="#020303" stroke="#cbd1d4" strokeWidth="7"/><ellipse cx="565" cy="230" rx="32" ry="24" fill="#8d9498" stroke="#eef1f2" strokeWidth="4"/><g stroke="#c0c6c9" opacity=".55"><path d="M50 150 l180 -45 M90 175 l170 -50 M185 205 l140 -44 M55 265 l180 -35 M250 310 l150 -50 M390 170 l130 -42 M520 330 l170 -65"/></g><g fill="#f4f6f7" fontFamily="system-ui" fontWeight="700" fontSize="22"><text x="520" y="110">SAR</text><text x="150" y="160">VM</text><text x="432" y="262">FA</text><text x="590" y="225">SN</text></g><path d="M585 220 L650 180" stroke="#fff" strokeWidth="3"/><text x="653" y="179" fill="#fff" fontFamily="system-ui" fontSize="18">N. saphenus</text></svg>}
+function ProbePosition(){return <svg className="atlas-probe-image atlas-probe-svg" viewBox="0 0 760 380" role="img" aria-label="Illustrative Sondenposition am medialen distalen Oberschenkel"><defs><linearGradient id="skin" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#d79f79"/><stop offset=".55" stopColor="#bd7e5b"/><stop offset="1" stopColor="#9f654b"/></linearGradient></defs><rect width="760" height="380" fill="#1a2530"/><path d="M170 18 C275 20 360 65 382 150 C402 225 348 348 240 370 C140 388 70 322 85 220 C100 120 92 30 170 18Z" fill="url(#skin)"/><path d="M515 15 C625 25 690 80 686 175 C681 280 625 363 540 370 C455 378 408 300 430 205 C454 102 433 35 515 15Z" fill="url(#skin)"/><g transform="translate(180 128) rotate(-14)"><rect x="0" y="0" rx="18" width="125" height="62" fill="#eef1f3" stroke="#bfc8cf" strokeWidth="5"/><rect x="44" y="48" rx="8" width="34" height="90" fill="#dfe5e9" stroke="#bfc8cf" strokeWidth="5"/><path d="M62 138 C40 190 20 220 0 250" fill="none" stroke="#dfe5e9" strokeWidth="12"/></g><g transform="translate(490 130) rotate(12)"><rect x="0" y="0" rx="18" width="125" height="62" fill="#eef1f3" stroke="#bfc8cf" strokeWidth="5"/><rect x="44" y="48" rx="8" width="34" height="90" fill="#dfe5e9" stroke="#bfc8cf" strokeWidth="5"/></g><path d="M165 315 C190 280 220 260 265 250" stroke="#fff" strokeWidth="5" fill="none"/><path d="M255 240 l18 12 -18 10" fill="#fff"/><path d="M560 90 C595 135 610 175 608 235" stroke="#fff" strokeWidth="5" fill="none"/><path d="M598 225 l11 20 10 -20" fill="#fff"/><text x="82" y="352" fill="#fff" fontFamily="system-ui" fontSize="20">Probe quer</text><text x="455" y="352" fill="#fff" fontFamily="system-ui" fontSize="20">Probe längs / Slide</text></svg>}
 function AtlasPlaceholder({label}:{label:string}){return <div className="atlas-placeholder" role="img" aria-label={label}><div className="atlas-placeholder-us"/><strong>{label}</strong><span>Atlas v1 erweitert die Bildsets blockweise.</span></div>}

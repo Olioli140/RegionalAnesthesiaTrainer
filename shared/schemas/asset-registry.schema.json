@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://regional-anesthesia-trainer.local/schemas/asset-registry.v1.json",
+  "title": "Regional Anesthesia Trainer Asset Registry v1",
+  "type": "object",
+  "required": ["schemaVersion", "registryVersion", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "registryVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "region", "view", "sourceType", "license", "version", "status", "path", "byteSize", "sha256", "qualityStatus", "validationStatus", "simulationRole"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_\\-]*$" },
+          "type": { "enum": ["ultrasound-image", "ultrasound-sequence", "anatomy-illustration", "probe-sweep", "needle-asset", "animation", "video", "audio", "icon", "3d-asset"] },
+          "region": { "type": "string", "minLength": 1 },
+          "view": { "type": "string", "minLength": 1 },
+          "sourceType": { "enum": ["generated", "project-created", "external-reference", "licensed-source", "unknown"] },
+          "source": { "type": "string" },
+          "author": { "type": "string" },
+          "license": { "type": "string", "minLength": 1 },
+          "attribution": { "type": "string" },
+          "generationMethod": { "type": "string" },
+          "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+          "status": { "enum": ["draft", "review", "production", "deprecated", "retired"] },
+          "path": { "type": "string", "minLength": 1 },
+          "width": { "type": "integer", "minimum": 1 },
+          "height": { "type": "integer", "minimum": 1 },
+          "durationMs": { "type": "integer", "minimum": 1 },
+          "byteSize": { "type": "integer", "minimum": 1 },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "probe": { "type": "string" },
+          "depthMm": { "type": "number", "exclusiveMinimum": 0 },
+          "gainDb": { "type": "number" },
+          "frequencyMHz": { "type": "number", "exclusiveMinimum": 0 },
+          "qualityStatus": { "enum": ["unreviewed", "engineering-reviewed", "approved"] },
+          "validationStatus": { "enum": ["unvalidated", "engineering-calibrated", "reference-only", "clinically-validated"] },
+          "simulationRole": { "enum": ["presentation-reference-only", "runtime-presentation", "none"] },
+          "created": { "type": "string" },
+          "deprecated": { "type": "boolean" },
+          "replacementAssetId": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" }, "uniqueItems": true }
+        }
+      }
+    }
+  }
+}

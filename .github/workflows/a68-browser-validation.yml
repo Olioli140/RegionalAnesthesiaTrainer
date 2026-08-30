@@ -1,0 +1,178 @@
+name: A6.8 Browser Validation
+
+on:
+  push:
+    branches: [a6.8-browser-validation]
+
+permissions:
+  contents: read
+
+jobs:
+  browser-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install trainer dependencies
+        run: npm install --prefix apps/regional-anesthesia-trainer
+
+      - name: Build exact trainer branch
+        run: npm run build --prefix apps/regional-anesthesia-trainer
+
+      - name: Install browser driver only for validation
+        run: npm install --no-save --prefix apps/regional-anesthesia-trainer puppeteer-core
+
+      - name: Start production preview
+        run: |
+          cd apps/regional-anesthesia-trainer
+          nohup npx vite preview --host 127.0.0.1 --port 4173 > /tmp/a68-vite-preview.log 2>&1 &
+          for i in {1..45}; do
+            if curl -sf http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/a68-vite-preview.log
+          exit 1
+
+      - name: Exercise browser UI and capture screenshots
+        run: |
+          cd apps/regional-anesthesia-trainer
+          CHROME="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
+          test -n "$CHROME"
+          export CHROME
+          cat > /tmp/a68-browser-validation.mjs <<'EOF'
+          import puppeteer from 'puppeteer-core';
+          import fs from 'node:fs';
+
+          const browserErrors=[];
+          const browser=await puppeteer.launch({
+            executablePath:process.env.CHROME,
+            headless:true,
+            args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']
+          });
+          const page=await browser.newPage();
+          await page.setViewport({width:1440,height:1200,deviceScaleFactor:1});
+          page.on('pageerror',error=>browserErrors.push(`pageerror: ${error.message}`));
+          page.on('console',message=>{if(message.type()==='error') browserErrors.push(`console: ${message.text()}`);});
+          page.on('requestfailed',request=>browserErrors.push(`requestfailed: ${request.url()} ${request.failure()?.errorText||''}`));
+
+          const delay=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
+          const waitReady=async()=>{
+            await delay(120);
+            await page.waitForFunction(()=>document.querySelector('.worker-status')?.textContent?.includes('Bereit'),{timeout:60000});
+          };
+          const clickByText=async(text)=>{
+            const handles=await page.$$('button');
+            for(const handle of handles){
+              const info=await handle.evaluate(el=>({text:(el.textContent||'').trim(),disabled:Boolean(el.disabled)}));
+              if(info.text===text){
+                if(info.disabled) throw new Error(`Button disabled when expected active: ${text}`);
+                await handle.click();
+                await waitReady();
+                return;
+              }
+            }
+            throw new Error(`Button not found: ${text}`);
+          };
+          const drag=async(selector,dx,dy)=>{
+            const element=await page.$(selector);
+            if(!element) throw new Error(`Direct-manipulation target not found: ${selector}`);
+            const box=await element.boundingBox();
+            if(!box) throw new Error(`No bounding box for ${selector}`);
+            const x=box.x+box.width/2,y=box.y+box.height/2;
+            await page.mouse.move(x,y);
+            await page.mouse.down();
+            await page.mouse.move(x+dx,y+dy,{steps:1});
+            await page.mouse.up();
+            await waitReady();
+          };
+
+          await page.goto('http://127.0.0.1:4173/',{waitUntil:'networkidle0',timeout:60000});
+          await page.waitForSelector('canvas',{timeout:60000});
+          await waitReady();
+          await page.screenshot({path:'../../trainer-a68-before.png',fullPage:true});
+
+          const initial=await page.evaluate(()=>({
+            title:document.title,
+            heading:document.querySelector('h1')?.textContent?.trim()||'',
+            buttons:Array.from(document.querySelectorAll('button')).map(el=>(el.textContent||el.getAttribute('aria-label')||el.getAttribute('title')||'').trim()),
+            rangeCount:document.querySelectorAll('input[type="range"]').length,
+            canvasCount:document.querySelectorAll('canvas').length,
+            status:document.querySelector('.worker-status')?.textContent?.trim()||'',
+            bodyText:(document.body.textContent||'').slice(0,4000)
+          }));
+
+          for(const text of ['Nerve','Needle','Overview','Aspirate']) await clickByText(text);
+
+          const ranges=await page.$$('input[type="range"]');
+          for(let index=0;index<ranges.length;index++){
+            const current=(await page.$$('input[type="range"]'))[index];
+            if(!current) throw new Error(`Range ${index} disappeared`);
+            await current.focus();
+            await page.keyboard.press('ArrowRight');
+            await waitReady();
+          }
+
+          await clickByText('Start injection');
+          await clickByText('Stop');
+          await clickByText('Advance +1 s');
+          await clickByText('Advance +5 s');
+
+          await drag('button.probe',34,-24);
+          const probe=await page.$('button.probe');
+          if(!probe) throw new Error('Probe target not found for wheel');
+          const probeBox=await probe.boundingBox();
+          if(!probeBox) throw new Error('Probe has no bounding box');
+          await page.mouse.move(probeBox.x+probeBox.width/2,probeBox.y+probeBox.height/2);
+          await page.mouse.wheel({deltaY:120});
+          await waitReady();
+          await drag('button[aria-label="Needle entry point"]',18,12);
+          await drag('button[aria-label="Needle trajectory handle"]',16,-14);
+
+          await clickByText('Verify replay');
+          const replayText=await page.evaluate(()=>document.querySelector('details.inspector summary')?.textContent?.replace(/\s+/g,' ').trim()||'');
+          if(!replayText.includes('MATCH')) throw new Error(`Replay did not report MATCH: ${replayText}`);
+          await page.screenshot({path:'../../trainer-a68-after-interactions.png',fullPage:true});
+
+          await clickByText('Reset');
+          const finalState=await page.evaluate(()=>({
+            status:document.querySelector('.worker-status')?.textContent?.trim()||'',
+            error:document.querySelector('.error')?.textContent?.trim()||null,
+            sceneReadout:document.querySelector('.scene-readout')?.textContent?.replace(/\s+/g,' ').trim()||'',
+            ultrasoundHeading:document.querySelector('.ultrasound-panel h2')?.textContent?.trim()||'',
+            actionSummary:document.querySelector('details.inspector summary')?.textContent?.replace(/\s+/g,' ').trim()||''
+          }));
+          await page.screenshot({path:'../../trainer-a68-after-reset.png',fullPage:true});
+
+          const result={
+            url:page.url(),
+            initial,
+            exercised:{
+              presetButtons:['Nerve','Needle','Overview'],
+              actionButtons:['Aspirate','Start injection','Stop','Advance +1 s','Advance +5 s','Verify replay','Reset'],
+              rangeInputs:ranges.length,
+              directManipulation:['probe slide','probe pressure','probe wheel rotation','needle entry drag','needle trajectory drag']
+            },
+            replayText,
+            finalState,
+            browserErrors
+          };
+          fs.writeFileSync('../../browser-validation.json',JSON.stringify(result,null,2));
+          await browser.close();
+          if(browserErrors.length) throw new Error(`Browser errors: ${browserErrors.join(' | ')}`);
+          EOF
+          node /tmp/a68-browser-validation.mjs
+
+      - name: Upload browser evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: a68-browser-evidence
+          path: |
+            trainer-a68-before.png
+            trainer-a68-after-interactions.png
+            trainer-a68-after-reset.png
+            browser-validation.json
+          if-no-files-found: error
+          retention-days: 14

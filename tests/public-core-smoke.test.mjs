@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { vec3 } from '../cores/regional-anesthesia/geometry/geometry.js';
 import { createNeedleGeometry } from '../shared/contracts/regional-anesthesia/needle.js';
-import { createAdductorCanalAnatomy, ADDUCTOR_CANAL_PRESET } from '../cores/regional-anesthesia/anatomy/adductor-canal-dataset.js';
+import { createAdductorCanalAnatomy, ADDUCTOR_CANAL_PRESET, ADDUCTOR_CANAL_IDS, getAdductorCanalGeometry, validateAdductorCanalDataset } from '../cores/regional-anesthesia/anatomy/adductor-canal-dataset.js';
+import { ADDUCTOR_CANAL_A6_8_DETAIL_PROFILE, getAdductorCanalA68ContourDetail } from '../cores/regional-anesthesia/anatomy/adductor-canal-a6-8-detail.js';
 import { getAdductorCanalGoldenPose, ADDUCTOR_CANAL_GOLDEN_POSE_ID } from '../cores/regional-anesthesia/anatomy/adductor-canal-golden-poses.js';
 import { resolveScanPlane } from '../cores/regional-anesthesia/scan-plane/scan-plane-resolver.js';
+import { resolveAnatomyCrossSections } from '../cores/regional-anesthesia/scan-plane/anatomy-cross-section-resolver.js';
 import { createCompletedUltrasoundPhysicsField } from '../cores/regional-anesthesia/ultrasound/ultrasound-physics-completion.js';
 import { createNeedleInteractionSnapshot } from '../cores/regional-anesthesia/needle/needle-interaction.js';
 import { createInjectionActionState, INJECTION_ACTION } from '../cores/regional-anesthesia/injection/injection-actions.js';
@@ -25,11 +27,21 @@ function runScenario() {
   d2 = reducePressureFlowAction(d2, { type: INJECTION_ACTION.ADVANCE_TIME, deltaSec: 5 }, { needleInteraction: c4 });
   d3 = advanceInjectionSpread(d3, d2);
   const d4 = createFluidUltrasoundOverlay({ baseField: c4.acoustics, spreadState: d3, scanPlane });
-  return { baseField, c4, d2, d3, d4 };
+  return { dataset, scanPlane, baseField, c4, d2, d3, d4 };
 }
 
 const a = runScenario();
 const b = runScenario();
+assert.equal(validateAdductorCanalDataset(a.dataset), true);
+assert.equal(ADDUCTOR_CANAL_A6_8_DETAIL_PROFILE.id, 'A6_8_ANATOMY_REALISM_V1');
+const sartoriusStructure=a.dataset.structures.find(s=>s.id===ADDUCTOR_CANAL_IDS.SARTORIUS);
+const sartorius = getAdductorCanalGeometry(a.dataset, sartoriusStructure.geometryId);
+assert.equal(sartorius.kind, 'ellipsoid');
+assert(getAdductorCanalA68ContourDetail(sartoriusStructure.geometryId).terms.length >= 3);
+const sections = resolveAnatomyCrossSections(a.dataset, a.scanPlane, {includeOutOfView:true});
+const sartoriusSection = sections.find(section=>section.structureId===ADDUCTOR_CANAL_IDS.SARTORIUS);
+assert.equal(sartoriusSection.shape, 'irregular-ellipse');
+assert.equal(a.scanPlane.probePressure, 0);
 assert.equal(a.baseField.kind, 'DETERMINISTIC_COMPLETED_ULTRASOUND_PHYSICS_FIELD');
 assert.equal(a.c4.kind, 'FROZEN_NEEDLE_INTERACTION_STATE');
 assert.equal(a.d2.kind, 'DETERMINISTIC_INJECTION_PRESSURE_FLOW_STATE');

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { ImagingSnapshot, UltrasoundFrame } from '../protocol';
 import { getAdductorReferenceAsset } from '../visual/ultrasound/hybridReference';
+import './hybridUltrasound.css';
 
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 

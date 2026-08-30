@@ -75,6 +75,19 @@ function perpendicularBasis(n){
   return [e1,normalize(cross(n,e1))];
 }
 
+function ellipsoidContourScale(geometry,t,centerU){
+  if(!Array.isArray(geometry.contourHarmonics)||geometry.contourHarmonics.length===0) return 1;
+  const twist=(Number(geometry.contourTwistRadPerUnit)||0)*centerU.z;
+  let factor=1;
+  for(const term of geometry.contourHarmonics){
+    const frequency=Math.max(1,Math.round(Number(term.frequency)||1));
+    const amplitude=Math.max(-0.12,Math.min(0.12,Number(term.amplitude)||0));
+    const phase=Number(term.phaseRad)||0;
+    factor+=amplitude*Math.cos(frequency*t+phase+twist);
+  }
+  return Math.max(0.80,Math.min(1.20,factor));
+}
+
 function intersectEllipsoid(structure,geometry,plane){
   const r=geometry.radiiMm;
   const n=worldToLocalVector(structure,plane.normal);
@@ -89,10 +102,11 @@ function intersectEllipsoid(structure,geometry,plane){
   const [e1,e2]=perpendicularBasis(nh),points=[];
   for(let i=0;i<SAMPLE_COUNT;i++){
     const t=2*Math.PI*i/SAMPLE_COUNT;
-    const u=add(centerU,add(scale(e1,circleRadius*Math.cos(t)),scale(e2,circleRadius*Math.sin(t))));
+    const contourScale=ellipsoidContourScale(geometry,t,centerU);
+    const u=add(centerU,add(scale(e1,circleRadius*contourScale*Math.cos(t)),scale(e2,circleRadius*contourScale*Math.sin(t))));
     points.push(localToWorldPoint(structure,vec3(u.x*r.x,u.y*r.y,u.z*r.z)));
   }
-  return summarize(structure,geometry,plane,points,'ellipse');
+  return summarize(structure,geometry,plane,points,geometry.contourHarmonics?.length?'irregular-ellipse':'ellipse');
 }
 
 function intersectCylinder(structure,geometry,plane){

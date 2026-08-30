@@ -1,0 +1,36 @@
+name: P1 Normalize Ultrasound Assets
+
+on:
+  push:
+    branches:
+      - feature/ac-us-asset-p1
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    if: ${{ !contains(github.event.head_commit.message, '[skip-reencode]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/ac-us-asset-p1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow
+      - name: Normalize WebP binaries
+        run: python scripts/reencode-ultrasound-assets.py
+      - name: Commit normalized binaries
+        run: |
+          if git diff --quiet -- apps/regional-anesthesia-trainer/public/assets/ultrasound/adductor-canal/v0.1; then
+            echo "No binary changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add apps/regional-anesthesia-trainer/public/assets/ultrasound/adductor-canal/v0.1
+          git commit -m "P1: normalize WebP binaries [skip-reencode]"
+          git push origin HEAD:feature/ac-us-asset-p1

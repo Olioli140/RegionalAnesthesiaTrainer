@@ -15,6 +15,8 @@ jobs:
           node-version: 22
       - name: Install trainer dependencies
         run: npm install --prefix apps/regional-anesthesia-trainer
+      - name: Platform data / asset registry validation
+        run: npm run test:platform
       - name: Ultrasound asset guard
         run: npm run test:assets
       - name: Core smoke test

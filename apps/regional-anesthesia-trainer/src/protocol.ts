@@ -47,12 +47,6 @@ export interface ImagingSnapshot {
   focusDepthMm: number;
   dynamicRangeDb: number;
 }
-export interface UltrasoundReferenceBlendSnapshot {
-  normalizedScanPosition: number;
-  lowerStation: 'proximal' | 'proximal-mid' | 'mid' | 'mid-distal' | 'distal';
-  upperStation: 'proximal' | 'proximal-mid' | 'mid' | 'mid-distal' | 'distal';
-  blend: number;
-}
 
 export type TrainerAction =
   | { type: 'RESET' }
@@ -87,7 +81,6 @@ export interface TrainerSnapshot {
   needle: NeedleSnapshot;
   injection: InjectionSnapshot;
   imaging: ImagingSnapshot;
-  ultrasoundReference: UltrasoundReferenceBlendSnapshot;
   insertionFraction: number;
   aspiration: string | null;
   injectionActive: boolean;

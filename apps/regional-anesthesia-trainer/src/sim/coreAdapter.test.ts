@@ -45,14 +45,14 @@ describe('RegionalTrainerEngine', () => {
     expect(engine.dispatch({ type: 'SET_REQUESTED_FLOW', flowMlPerMin: 8 }).ultrasound).toEqual(initial);
   });
 
-  it('renders the versioned deterministic A6.5 appearance field', () => {
+  it('renders the versioned deterministic A6.8 appearance field', () => {
     const first = new RegionalTrainerEngine().snapshot();
     const second = new RegionalTrainerEngine().snapshot();
     expect(first.ultrasound).toEqual(second.ultrasound);
     expect((first.developer as any).appearance).toEqual({
       kind: 'DETERMINISTIC_ULTRASOUND_APPEARANCE_FIELD',
-      version: 'A6.5',
-      profileId: 'A6_ADDUCTOR_CANAL_V5',
+      version: 'A6.8',
+      profileId: 'A6_ADDUCTOR_CANAL_V6',
       sourceKind: 'DETERMINISTIC_ULTRASOUND_FLUID_OVERLAY_FIELD',
       tissueSignatureStatus: 'TISSUE_CLASS_MAPPED',
       poseContinuityStatus: 'WORLD_COORDINATE_COHERENT',

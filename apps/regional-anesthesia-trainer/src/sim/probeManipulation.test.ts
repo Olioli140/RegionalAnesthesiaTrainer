@@ -29,6 +29,15 @@ describe('Trainer A2 probe manipulation',()=>{
     expect(frameDelta(before.ultrasound.pixels,after.ultrasound.pixels)).toBeGreaterThan(1);
   },15000);
 
+  it('makes probe pressure visibly compress the synthetic vein signature',()=>{
+    const engine=new RegionalTrainerEngine();
+    const low=engine.dispatch({type:'PROBE_PRESSURE_SET',pressure:0});
+    const high=engine.dispatch({type:'PROBE_PRESSURE_SET',pressure:1});
+    expect(low.probe.pressure).toBe(0);
+    expect(high.probe.pressure).toBe(1);
+    expect(frameDelta(low.ultrasound.pixels,high.ultrasound.pixels)).toBeGreaterThan(0.5);
+  },15000);
+
   it('replays a mixed probe/needle/injection sequence deterministically',()=>{
     const engine=new RegionalTrainerEngine();
     engine.dispatch({type:'PROBE_SLIDE',deltaMm:15});

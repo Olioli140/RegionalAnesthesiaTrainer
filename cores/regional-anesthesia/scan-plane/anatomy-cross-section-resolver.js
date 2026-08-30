@@ -1,5 +1,6 @@
 import {add,cross,dot,length,normalize,rotateVector,scale,sub,vec3} from '../geometry/geometry.js';
 import {getAdductorCanalGeometry} from '../anatomy/adductor-canal-dataset.js';
+import {getAdductorCanalA68ContourDetail} from '../anatomy/adductor-canal-a6-8-detail.js';
 import {signedDistanceToPlane} from './scan-plane-resolver.js';
 
 const EPS=1e-8;
@@ -75,6 +76,27 @@ function perpendicularBasis(n){
   return [e1,normalize(cross(n,e1))];
 }
 
+function contourDetailFor(structure,geometry){
+  if(Array.isArray(geometry.contourHarmonics)&&geometry.contourHarmonics.length){
+    return {twist:Number(geometry.contourTwistRadPerUnit)||0,terms:geometry.contourHarmonics};
+  }
+  return getAdductorCanalA68ContourDetail(structure.geometryId);
+}
+
+function ellipsoidContourScale(structure,geometry,t,centerU){
+  const detail=contourDetailFor(structure,geometry);
+  if(!detail?.terms?.length) return 1;
+  const twist=(Number(detail.twist)||0)*centerU.z;
+  let factor=1;
+  for(const term of detail.terms){
+    const frequency=Math.max(1,Math.round(Number(Array.isArray(term)?term[0]:term.frequency)||1));
+    const amplitude=Math.max(-0.12,Math.min(0.12,Number(Array.isArray(term)?term[1]:term.amplitude)||0));
+    const phase=Number(Array.isArray(term)?term[2]:term.phaseRad)||0;
+    factor+=amplitude*Math.cos(frequency*t+phase+twist);
+  }
+  return Math.max(0.80,Math.min(1.20,factor));
+}
+
 function intersectEllipsoid(structure,geometry,plane){
   const r=geometry.radiiMm;
   const n=worldToLocalVector(structure,plane.normal);
@@ -87,12 +109,14 @@ function intersectEllipsoid(structure,geometry,plane){
   if(Math.abs(d)>1+EPS) return summarize(structure,geometry,plane,[],'ellipse');
   const nh=scale(m,1/ml),centerU=scale(nh,d),circleRadius=Math.sqrt(Math.max(0,1-d*d));
   const [e1,e2]=perpendicularBasis(nh),points=[];
+  const irregular=Boolean(contourDetailFor(structure,geometry)?.terms?.length);
   for(let i=0;i<SAMPLE_COUNT;i++){
     const t=2*Math.PI*i/SAMPLE_COUNT;
-    const u=add(centerU,add(scale(e1,circleRadius*Math.cos(t)),scale(e2,circleRadius*Math.sin(t))));
+    const contourScale=ellipsoidContourScale(structure,geometry,t,centerU);
+    const u=add(centerU,add(scale(e1,circleRadius*contourScale*Math.cos(t)),scale(e2,circleRadius*contourScale*Math.sin(t))));
     points.push(localToWorldPoint(structure,vec3(u.x*r.x,u.y*r.y,u.z*r.z)));
   }
-  return summarize(structure,geometry,plane,points,'ellipse');
+  return summarize(structure,geometry,plane,points,irregular?'irregular-ellipse':'ellipse');
 }
 
 function intersectCylinder(structure,geometry,plane){

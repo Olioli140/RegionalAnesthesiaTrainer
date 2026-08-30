@@ -1,0 +1,14 @@
+.hybrid-mode-badge {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 3;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid rgba(173, 222, 255, 0.42);
+  border-radius: 4px;
+  background: rgba(4, 12, 18, 0.58);
+  color: rgba(220, 242, 255, 0.88);
+  font: 700 0.58rem/1 ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}

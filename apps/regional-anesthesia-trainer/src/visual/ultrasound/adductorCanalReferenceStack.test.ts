@@ -22,12 +22,13 @@ describe('ADDUCTOR_CANAL_REFERENCE_STACK_V0_1', () => {
     ]);
   });
 
-  it('keeps binary assets presentation-only and uniquely addressable', () => {
+  it('keeps generated binary assets presentation-only and uniquely addressable', () => {
     const paths = ADDUCTOR_CANAL_REFERENCE_STACK_V0_1.map((frame) => frame.src);
     expect(new Set(paths).size).toBe(5);
     expect(ADDUCTOR_CANAL_REFERENCE_STACK_V0_1.every((frame) => frame.src.endsWith('.webp'))).toBe(true);
+    expect(ADDUCTOR_CANAL_REFERENCE_STACK_V0_1.every((frame) => frame.widthPx === 640 && frame.heightPx === 720)).toBe(true);
     expect(ADDUCTOR_CANAL_REFERENCE_STACK_V0_1.every((frame) => frame.role === 'presentation-reference-only')).toBe(true);
-    expect(ADDUCTOR_CANAL_REFERENCE_STACK_V0_1.every((frame) => frame.source === 'openai-generated-p1-reference')).toBe(true);
+    expect(ADDUCTOR_CANAL_REFERENCE_STACK_V0_1.every((frame) => frame.source === 'deterministic-p1-generator')).toBe(true);
   });
 
   it('resolves nearest reference frames deterministically without simulation state', () => {
